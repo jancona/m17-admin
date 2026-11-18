@@ -1,0 +1,40 @@
+# m17-admin
+
+The setup wizard for [m17-hotspot-os](https://github.com/jancona/m17-hotspot-os): admin password, WiFi, callsign, radio HAT, frequency, reflector and automatic updates, in eight short steps that work on a phone. Later it will also serve the hotspot's system pages.
+
+> **Status: in development.** The wizard runs against a simulated hotspot (`-dev`). The real platform (applying settings through m17os-config, WiFi scanning, HAT detection), the m17-apk package and the setup access point come next.
+
+## Running it
+
+```bash
+go run ./cmd/m17-admin -dev
+```
+
+Then open http://127.0.0.1:8090/setup/. `-dev` simulates an unconfigured hotspot with an MMDVM_HS_Dual_Hat and a few WiFi networks, and keeps the wizard's state in a temporary directory that's removed on exit.
+
+## How it fits together
+
+- **Behind nginx.** m17-admin listens on `127.0.0.1:8090`; nginx sends it `/setup/`. While the setup access point is up, nginx sends it every host name, and m17-admin answers the phones' captive-portal checks (`/generate_204`, `/hotspot-detect.html`, `/connecttest.txt`, ...) with a redirect to the wizard.
+- **One admin password.** It's the password for rpi-dashboard's admin pages (a bcrypt hash in its `config.php`). Until it is set, only the first step is open; after that, a login is required.
+- **Settings are applied by m17os-config.** The wizard produces the same keys as `m17-config.txt` (`wifi_ssid`, `callsign`, `frequency`, ...), so there is one implementation of applying them, and its warnings come back to the done page.
+- **Progress is kept on disk** (`/var/lib/m17-admin/wizard.json`, mode 0600), so a reboot or the switch from the setup access point to WiFi doesn't lose it. It's deleted once the settings are applied, since it may hold the WiFi password.
+- **The OS-specific parts** (applying settings, WiFi, HAT detection) are behind `internal/platform.Platform`, so a Raspberry Pi OS implementation can be added for the installer.
+
+| Package | |
+|---|---|
+| `cmd/m17-admin` | Flags and the HTTP server |
+| `internal/web` | Routes, handlers, templates, CSS and the little JavaScript (every page works without it) |
+| `internal/wizard` | The steps, their order, and the saved progress |
+| `internal/settings` | The draft, its validation, and the m17-config.txt keys it becomes |
+| `internal/auth` | Sessions (new ID at login), CSRF tokens, slowing down wrong passwords |
+| `internal/platform` | The interface to the OS, and the fake used by `-dev` and the tests |
+
+No web framework: the standard library (`net/http` routing, `html/template`, `embed`, `log/slog`) plus `golang.org/x/crypto/bcrypt`.
+
+## Tests
+
+```bash
+go test -race ./...
+```
+
+The web tests run whole wizards through the HTTP handlers: the order of the steps, login and logout, CSRF rejection, a new session ID at login, validation errors that keep what was typed, warnings that don't block, the applied settings, and that the WiFi password isn't kept or shown afterwards.

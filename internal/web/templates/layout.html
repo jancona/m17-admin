@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · M17 hotspot setup</title>
+<link rel="stylesheet" href="/setup/static/style.css">
+<script src="/setup/static/app.js" defer></script>
+</head>
+<body>
+<header class="top">
+	<div class="brand">M17 hotspot <span>setup</span></div>
+	{{if .LoggedIn}}
+	<form method="post" action="/setup/logout" class="logout">
+		<input type="hidden" name="csrf" value="{{.CSRF}}">
+		<button type="submit" class="link">Log out</button>
+	</form>
+	{{end}}
+</header>
+
+{{if .Steps}}
+<nav class="progress" aria-label="Setup steps">
+	<ol>
+	{{$cur := .Step}}{{$st := .State}}
+	{{range .Steps}}
+		<li class="{{if eq .ID $cur}}current{{else if done $st .ID}}done{{end}}"{{if eq .ID $cur}} aria-current="step"{{end}}>
+			{{if and (done $st .ID) (ne .ID $cur)}}<a href="/setup/{{.ID}}">{{.Title}}</a>{{else}}<span>{{.Title}}</span>{{end}}
+		</li>
+	{{end}}
+	</ol>
+</nav>
+{{end}}
+
+<main>
+	{{if and .Step (ne .Step "done")}}<p class="stepno">Step {{stepIndex .Step}} of {{len .Steps}}</p>{{end}}
+	<h1>{{.Title}}</h1>
+	{{template "content" .}}
+</main>
+</body>
+</html>

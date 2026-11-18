@@ -1,0 +1,23 @@
+{{define "content"}}
+{{with .Result}}
+{{if .Warnings}}
+<div class="notice warn">
+	<p><strong>Some settings weren't applied:</strong></p>
+	<ul>{{range .Warnings}}<li>{{.}}</li>{{end}}</ul>
+	<p><a href="/setup/">Run setup again</a> to fix them.</p>
+</div>
+{{else}}
+<div class="notice ok"><p><strong>Your hotspot is set up.</strong></p></div>
+{{end}}
+{{if .RebootNeeded}}
+<p>The hotspot is restarting to finish setting up the radio HAT. This takes about a minute.</p>
+{{end}}
+{{if .NetworkChanged}}
+<p>The hotspot is joining “{{$.Draft.WiFiSSID}}”. Connect your phone or computer to the same network, then open
+<a href="http://{{$.Draft.Hostname}}.local/">http://{{$.Draft.Hostname}}.local/</a>.</p>
+<p class="hint">If it can't join that network, it brings back its own <strong>M17-Setup</strong> WiFi within a few minutes, so you can try again.</p>
+{{else}}
+<p><a class="button" href="/">Open the dashboard</a></p>
+{{end}}
+{{end}}
+{{end}}

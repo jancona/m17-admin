@@ -1,0 +1,51 @@
+{{define "content"}}
+<p>Check the settings, then apply them.</p>
+{{with .Draft}}
+<dl class="summary">
+	<dt>Network</dt>
+	<dd>{{if .UseWiFi}}WiFi “{{.WiFiSSID}}”{{if .WiFiPassword}}, with password{{else}}, open{{end}} ({{.WiFiCountry}}){{else}}Ethernet{{end}}
+		<a href="/setup/network">Change</a></dd>
+	<dt>Callsign</dt>
+	<dd>{{.FullCallsign}} <a href="/setup/station">Change</a></dd>
+	<dt>Time zone</dt>
+	<dd>{{.TimeZone}} <a href="/setup/station">Change</a></dd>
+	<dt>Hotspot name</dt>
+	<dd>{{.Hostname}}.local <a href="/setup/station">Change</a></dd>
+	<dt>Radio HAT</dt>
+	<dd>{{if eq .HATType "cc1200"}}CC1200{{else if eq .HATType "mmdvm"}}MMDVM{{else}}SX1255{{end}} <a href="/setup/hat">Change</a></dd>
+	<dt>Frequency</dt>
+	<dd>{{if .Duplex}}RX {{mhz .RXFrequency}} MHz, TX {{mhz .TXFrequency}} MHz (duplex){{else}}{{mhz .RXFrequency}} MHz{{end}}, {{.Power}} dBm
+		<a href="/setup/radio">Change</a></dd>
+	<dt>Reflector</dt>
+	<dd>{{if .Reflector}}{{.Reflector}} module {{.Module}}{{else}}None (RF only){{end}} <a href="/setup/reflector">Change</a></dd>
+	<dt>Updates</dt>
+	<dd>{{if eq .AutoUpdate "auto"}}Automatic{{else if eq .AutoUpdate "notify"}}Check only{{else}}Off{{end}}{{if ne .AutoUpdate "off"}}, at {{printf "%02d:00" .UpdateHour}}{{end}}
+		<a href="/setup/updates">Change</a></dd>
+</dl>
+{{end}}
+
+{{if .Warnings}}
+<div class="notice warn">
+	<p><strong>Please check:</strong></p>
+	<ul>{{range .Warnings}}<li>{{.}}</li>{{end}}</ul>
+</div>
+{{end}}
+
+{{if eq .Draft.HATType "sx1255"}}
+<p class="hint">The hotspot will restart once to enable the SX1255's audio interface.</p>
+{{end}}
+{{if .Draft.UseWiFi}}
+<div class="notice">
+	<p>If your phone or computer is connected to the hotspot's own <strong>M17-Setup</strong> WiFi, it will lose that connection when the hotspot joins “{{.Draft.WiFiSSID}}”. Reconnect to your usual WiFi, then open
+	<strong>http://{{.Draft.Hostname}}.local/</strong>.</p>
+</div>
+{{end}}
+
+<form method="post" action="/setup/review">
+	<input type="hidden" name="csrf" value="{{.CSRF}}">
+	<div class="actions">
+		{{if .Prev}}<a class="back" href="/setup/{{.Prev}}">Back</a>{{end}}
+		<button type="submit">Apply settings</button>
+	</div>
+</form>
+{{end}}

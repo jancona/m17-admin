@@ -1,0 +1,168 @@
+/* m17-admin: phone first, light and dark following the device */
+:root {
+	--bg: #f5f6f8;
+	--card: #ffffff;
+	--text: #1c1f24;
+	--muted: #5d6673;
+	--line: #d8dde4;
+	--accent: #1f6feb;
+	--accent-text: #ffffff;
+	--ok-bg: #e6f4ea;
+	--ok-line: #8fcf9f;
+	--warn-bg: #fff6e0;
+	--warn-line: #e8c46a;
+	--error: #c62828;
+	--focus: #1f6feb55;
+	--radius: 10px;
+	color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #15181d;
+		--card: #1e2228;
+		--text: #e6e9ee;
+		--muted: #9aa4b2;
+		--line: #353b44;
+		--accent: #4c8dff;
+		--accent-text: #0b0d10;
+		--ok-bg: #16301f;
+		--ok-line: #2f6b41;
+		--warn-bg: #33290f;
+		--warn-line: #7a6222;
+		--error: #ff7b7b;
+		--focus: #4c8dff66;
+	}
+}
+
+* { box-sizing: border-box; }
+/* hidden must win over display rules such as .js .js-only */
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	background: var(--card);
+	border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 700; letter-spacing: .01em; }
+.brand span { color: var(--muted); font-weight: 400; }
+.logout { margin: 0; }
+
+.progress { max-width: 640px; margin: 12px auto 0; padding: 0 16px; }
+.progress ol {
+	display: flex; flex-wrap: wrap; gap: 4px 6px;
+	list-style: none; margin: 0; padding: 0;
+	font-size: 13px; color: var(--muted);
+}
+.progress li { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); }
+.progress li.done { border-color: var(--ok-line); }
+.progress li.done a { color: inherit; text-decoration: none; }
+.progress li.current { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+
+main {
+	max-width: 640px;
+	margin: 12px auto 32px;
+	padding: 20px 16px 24px;
+	background: var(--card);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+}
+@media (max-width: 672px) {
+	main { margin: 12px 0 24px; border-radius: 0; border-left: 0; border-right: 0; }
+}
+h1 { font-size: 1.4rem; margin: 0 0 12px; }
+.stepno { margin: 0; color: var(--muted); font-size: 13px; }
+p { margin: 8px 0; }
+a { color: var(--accent); }
+code { font-size: .92em; background: var(--bg); padding: 1px 4px; border-radius: 4px; }
+
+label { display: block; font-weight: 600; margin: 16px 0 4px; }
+.optional { font-weight: 400; color: var(--muted); }
+input[type=text], input:not([type]), input[type=password], input[type=number], input[type=search], select {
+	width: 100%;
+	padding: 10px 12px;
+	font: inherit;
+	color: var(--text);
+	background: var(--card);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+}
+input.short, select.short { width: auto; min-width: 6em; }
+input.upper { text-transform: uppercase; }
+select[size] { padding: 4px; }
+input:focus, select:focus, button:focus-visible, a:focus-visible {
+	outline: 3px solid var(--focus);
+	outline-offset: 1px;
+	border-color: var(--accent);
+}
+[aria-invalid=true] { border-color: var(--error); }
+
+fieldset { border: 0; margin: 16px 0 0; padding: 0; }
+legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
+label.choice {
+	display: flex; align-items: flex-start; gap: 10px;
+	font-weight: 400; margin: 6px 0; cursor: pointer;
+}
+label.choice input { margin-top: 4px; flex: none; width: 18px; height: 18px; }
+label.card { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+label.card:has(input:checked) { border-color: var(--accent); }
+
+ul.networks, ul.choices { list-style: none; margin: 0 0 8px; padding: 0; }
+ul.networks li label, ul.choices li label { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; }
+ul.networks li label:has(input:checked), ul.choices li label:has(input:checked) { border-color: var(--accent); }
+ul.scroll { max-height: 340px; overflow-y: auto; padding-right: 4px; }
+label.sub { font-weight: 400; margin-top: 4px; }
+.ssid { flex: 1; word-break: break-word; }
+.meta { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.bars { letter-spacing: -1px; }
+
+.row { display: flex; gap: 12px; align-items: flex-end; }
+.row .grow { flex: 1; }
+.row label { margin-top: 16px; }
+
+.hint { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+.error { color: var(--error); font-weight: 600; margin: 4px 0 0; }
+.warning { color: var(--text); background: var(--warn-bg); border-left: 4px solid var(--warn-line); padding: 6px 10px; margin: 6px 0 0; border-radius: 4px; }
+
+.notice { border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; margin: 12px 0; }
+.notice.ok { background: var(--ok-bg); border-color: var(--ok-line); }
+.notice.warn { background: var(--warn-bg); border-color: var(--warn-line); }
+.notice ul { margin: 4px 0; padding-left: 20px; }
+.ident { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; word-break: break-word; }
+
+dl.summary { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 12px 0; }
+dl.summary dt { font-weight: 600; }
+dl.summary dd { margin: 0; word-break: break-word; }
+dl.summary dd a { font-size: 14px; margin-left: 6px; }
+@media (max-width: 420px) {
+	dl.summary { grid-template-columns: 1fr; gap: 2px; }
+	dl.summary dd { margin-bottom: 8px; }
+}
+
+.actions { display: flex; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 24px; }
+.actions .back { margin-right: auto; }
+button, a.button {
+	font: inherit; font-weight: 600;
+	padding: 10px 20px;
+	border: 0; border-radius: 8px;
+	background: var(--accent); color: var(--accent-text);
+	cursor: pointer; text-decoration: none; display: inline-block;
+}
+button.link { background: none; color: var(--accent); padding: 0; font-weight: 400; }
+
+/* Shown or hidden by app.js; without JavaScript everything stays visible */
+.js .js-hidden { display: none; }
+.js-only { display: none; }
+.js .js-only { display: block; }
+.duplex-label { display: none; }
+.js.duplex .duplex-label { display: inline; }
+.js.duplex .simplex-label { display: none; }

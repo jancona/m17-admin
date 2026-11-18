@@ -1,0 +1,39 @@
+{{define "content"}}
+<form method="post" action="/setup/radio">
+	<input type="hidden" name="csrf" value="{{.CSRF}}">
+	{{$duplexOK := ne .Draft.HATType "cc1200"}}
+	{{if $duplexOK}}
+	<label class="choice"><input type="checkbox" name="duplex" id="duplex" {{if .Draft.Duplex}}checked{{end}}>
+		Duplex: receive and transmit on different frequencies at the same time</label>
+	<p class="hint">Only with a duplex board (two radios), e.g. the MMDVM_HS_Dual_Hat.</p>
+	{{end}}
+
+	<label for="rx_mhz"><span class="simplex-label">Frequency</span><span class="duplex-label">Receive frequency</span> (MHz)</label>
+	<input id="rx_mhz" name="rx_mhz" inputmode="decimal" value="{{mhz .Draft.RXFrequency}}" required placeholder="439.500"
+		{{with index .Errors "rx_mhz"}}aria-invalid="true"{{end}}>
+	{{with index .Errors "rx_mhz"}}<p class="error">{{.}}</p>{{end}}
+	{{with index .Warnings "rx_mhz"}}<p class="warning">{{.}}</p>{{end}}
+
+	{{if $duplexOK}}
+	<div class="duplex-only">
+		<label for="tx_mhz">Transmit frequency (MHz)</label>
+		<input id="tx_mhz" name="tx_mhz" inputmode="decimal" value="{{if .Draft.Duplex}}{{mhz .Draft.TXFrequency}}{{end}}" placeholder="434.500"
+			{{with index .Errors "tx_mhz"}}aria-invalid="true"{{end}}>
+		{{with index .Errors "tx_mhz"}}<p class="error">{{.}}</p>{{end}}
+		{{with index .Warnings "tx_mhz"}}<p class="warning">{{.}}</p>{{end}}
+	</div>
+	{{end}}
+	<p class="hint">Choose a frequency your local band plan sets aside for digital voice or hotspots, and that nobody nearby uses.</p>
+
+	<label for="power">Transmit power (dBm)</label>
+	<input id="power" name="power" type="number" min="-20" max="30" step="1" value="{{.Draft.Power}}" class="short"
+		{{with index .Errors "power"}}aria-invalid="true"{{end}}>
+	<p class="hint">10 dBm is 10 mW: plenty for a hotspot in the same building.</p>
+	{{with index .Errors "power"}}<p class="error">{{.}}</p>{{end}}
+
+	<div class="actions">
+		{{if .Prev}}<a class="back" href="/setup/{{.Prev}}">Back</a>{{end}}
+		<button type="submit">Continue</button>
+	</div>
+</form>
+{{end}}
