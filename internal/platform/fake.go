@@ -53,6 +53,7 @@ func NewFake() *Fake {
 		hat: HAT{
 			Type:  "mmdvm",
 			Ident: "MMDVM_HS_Dual_Hat-v1.6.1 20261116 14.7456MHz dual ADF7021 FW by CA6JAU (M17)",
+			Speed: 115200,
 		},
 		reflectors: []Reflector{
 			{Name: "M17-M17", Server: "107.191.121.105", Port: 17000},

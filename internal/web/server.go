@@ -312,6 +312,10 @@ func (s *Server) newPage(ctx context.Context, sess *auth.Session, st *wizard.Sta
 			s.log.Warn("HAT detection failed", "err", err)
 		}
 		p.HAT = hat
+		st.DetectedHAT = hat
+		if err := s.store.Save(*st); err != nil {
+			return nil, err
+		}
 	case "reflector":
 		refl, err := s.plat.Reflectors(ctx)
 		if err != nil {
@@ -414,6 +418,12 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 		probs = d.CheckStation(zones)
 	case "hat":
 		d.HATType = f.Get("hat_type")
+		// The speed the HAT answered at, if it's the type chosen; otherwise
+		// the type's usual speed
+		d.ModemSpeed = 0
+		if st.DetectedHAT.Type == d.HATType && st.DetectedHAT.Speed > 0 {
+			d.ModemSpeed = st.DetectedHAT.Speed
+		}
 		if d.HATType == "cc1200" {
 			d.Duplex = false // the CC1200 HAT is simplex
 		}

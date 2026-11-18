@@ -2,7 +2,7 @@
 
 The setup wizard for [m17-hotspot-os](https://github.com/jancona/m17-hotspot-os): admin password, WiFi, callsign, radio HAT, frequency, reflector and automatic updates, in eight short steps that work on a phone. Later it will also serve the hotspot's system pages.
 
-> **Status: in development.** The wizard runs against a simulated hotspot (`-dev`). The real platform (applying settings through m17os-config, WiFi scanning, HAT detection), the m17-apk package and the setup access point come next.
+> **Status: in development.** The wizard works against a simulated hotspot (`-dev`) and, on m17-hotspot-os, against the real one (`internal/platform/alpine.go`). The setup access point comes next.
 
 ## Running it
 
@@ -18,6 +18,7 @@ Then open http://127.0.0.1:8090/setup/. `-dev` simulates an unconfigured hotspot
 - **One admin password.** It's the password for rpi-dashboard's admin pages (a bcrypt hash in its `config.php`). Until it is set, only the first step is open; after that, a login is required.
 - **Settings are applied by m17os-config.** The wizard produces the same keys as `m17-config.txt` (`wifi_ssid`, `callsign`, `frequency`, ...), so there is one implementation of applying them, and its warnings come back to the done page.
 - **Progress is kept on disk** (`/var/lib/m17-admin/wizard.json`, mode 0600), so a reboot or the switch from the setup access point to WiFi doesn't lose it. It's deleted once the settings are applied, since it may hold the WiFi password.
+- **On m17-hotspot-os** m17-admin runs as its own user. It reads the gateway's INI file, the host files, the time zone list and the dashboard's password hash directly, and does everything that needs root (applying settings, WiFi scans, stopping the gateway to probe the HAT) through `/usr/local/libexec/m17os/admin-helper`, which `doas` lets it run.
 - **The OS-specific parts** (applying settings, WiFi, HAT detection) are behind `internal/platform.Platform`, so a Raspberry Pi OS implementation can be added for the installer.
 
 | Package | |
@@ -27,7 +28,8 @@ Then open http://127.0.0.1:8090/setup/. `-dev` simulates an unconfigured hotspot
 | `internal/wizard` | The steps, their order, and the saved progress |
 | `internal/settings` | The draft, its validation, and the m17-config.txt keys it becomes |
 | `internal/auth` | Sessions (new ID at login), CSRF tokens, slowing down wrong passwords |
-| `internal/platform` | The interface to the OS, and the fake used by `-dev` and the tests |
+| `internal/platform` | The interface to the OS: `Alpine` for m17-hotspot-os, and the fake used by `-dev` and the tests |
+| `internal/hat` | Identifies a CC1200 HAT or MMDVM board on the serial port, and the speed it answers at (a port of the installer's probe) |
 
 No web framework: the standard library (`net/http` routing, `html/template`, `embed`, `log/slog`) plus `golang.org/x/crypto/bcrypt`.
 

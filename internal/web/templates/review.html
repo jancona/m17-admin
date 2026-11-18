@@ -12,7 +12,7 @@
 	<dt>Hotspot name</dt>
 	<dd>{{.Hostname}}.local <a href="/setup/station">Change</a></dd>
 	<dt>Radio HAT</dt>
-	<dd>{{if eq .HATType "cc1200"}}CC1200{{else if eq .HATType "mmdvm"}}MMDVM{{else}}SX1255{{end}} <a href="/setup/hat">Change</a></dd>
+	<dd>{{if eq .HATType "cc1200"}}CC1200{{else if eq .HATType "mmdvm"}}MMDVM{{else}}SX1255{{end}}{{if .ModemSpeed}}, {{.ModemSpeed}} baud (detected){{end}} <a href="/setup/hat">Change</a></dd>
 	<dt>Frequency</dt>
 	<dd>{{if .Duplex}}RX {{mhz .RXFrequency}} MHz, TX {{mhz .TXFrequency}} MHz (duplex){{else}}{{mhz .RXFrequency}} MHz{{end}}, {{.Power}} dBm
 		<a href="/setup/radio">Change</a></dd>

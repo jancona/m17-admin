@@ -79,6 +79,7 @@ type Network struct {
 type HAT struct {
 	Type  string // cc1200 or mmdvm; "" if nothing answered
 	Ident string // what the modem reported, e.g. its firmware version
+	Speed int    // the serial speed it answered at (baud)
 }
 
 // Reflector is an entry in the host files.

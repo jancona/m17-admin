@@ -12,6 +12,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/jancona/m17-admin/internal/platform"
 	"github.com/jancona/m17-admin/internal/settings"
 )
 
@@ -65,6 +66,9 @@ type State struct {
 	// Started is false until the draft has been filled from the
 	// hotspot's current settings.
 	Started bool `json:"started"`
+	// DetectedHAT is what the HAT step found, so its serial speed can be
+	// used if the user keeps that HAT type.
+	DetectedHAT platform.HAT `json:"detected_hat"`
 }
 
 // IsDone reports whether step id has been completed.

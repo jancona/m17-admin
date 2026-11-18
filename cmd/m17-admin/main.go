@@ -47,7 +47,7 @@ func main() {
 		*stateDir = dir
 		log.Info("development mode: simulated hotspot", "state", dir)
 	} else {
-		fail(log, errors.New("only -dev is supported so far: the Alpine platform isn't written yet"))
+		plat = platform.NewAlpine()
 	}
 
 	srv, err := web.New(plat, wizard.NewStore(*stateDir), log)

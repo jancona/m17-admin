@@ -31,6 +31,7 @@ type Draft struct {
 
 	// Radio
 	HATType     string  `json:"hat_type"`
+	ModemSpeed  int     `json:"modem_speed"` // detected serial speed; 0 for the HAT type's default
 	RXFrequency float64 `json:"rx_mhz"`
 	TXFrequency float64 `json:"tx_mhz"`
 	Duplex      bool    `json:"duplex"`
@@ -299,6 +300,10 @@ func (d Draft) Settings() []platform.Setting {
 	add("timezone", d.TimeZone)
 	add("callsign", d.FullCallsign())
 	add("hat", d.HATType)
+	if d.ModemSpeed > 0 && d.HATType != "sx1255" {
+		// After hat, which sets the type's usual speed
+		add("modem_speed", strconv.Itoa(d.ModemSpeed))
+	}
 	if d.Duplex {
 		add("rx_frequency", mhz(d.RXFrequency))
 		add("tx_frequency", mhz(d.TXFrequency))
