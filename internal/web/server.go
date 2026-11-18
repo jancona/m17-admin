@@ -218,6 +218,17 @@ func (s *Server) state(ctx context.Context) (wizard.State, error) {
 	if err != nil {
 		return st, err
 	}
+	if st.Started && st.Draft.SavedSSIDs == nil {
+		// A draft from before m17-admin tracked the saved networks: fetch
+		// them, so a saved network isn't rewritten without its password
+		if cur, err := s.plat.Current(ctx); err == nil && len(cur.WiFiSSIDs) > 0 {
+			st.Draft.SavedSSIDs = cur.WiFiSSIDs
+			st.Draft.UpdateKeepWiFi()
+			if err := s.store.Save(st); err != nil {
+				return st, err
+			}
+		}
+	}
 	if !st.Started {
 		cur, err := s.plat.Current(ctx)
 		if err != nil {
@@ -404,6 +415,7 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 			d.WiFiPassword = pw
 		}
 		d.WiFiCountry = strings.ToUpper(f.Get("wifi_country"))
+		d.UpdateKeepWiFi()
 		probs = d.CheckNetwork(settings.CountryCodes())
 	case "station":
 		d.Callsign = strings.ToUpper(strings.TrimSpace(f.Get("callsign")))

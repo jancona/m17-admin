@@ -3,7 +3,7 @@
 {{with .Draft}}
 <dl class="summary">
 	<dt>Network</dt>
-	<dd>{{if .UseWiFi}}WiFi “{{.WiFiSSID}}”{{if .WiFiPassword}}, with password{{else}}, open{{end}} ({{.WiFiCountry}}){{else}}Ethernet{{end}}
+	<dd>{{if .UseWiFi}}WiFi “{{.WiFiSSID}}”{{if .KeepWiFi}}, saved settings, unchanged{{else if .WiFiPassword}}, with password{{else}}, open{{end}} ({{.WiFiCountry}}){{else}}Ethernet{{end}}
 		<a href="/setup/network">Change</a></dd>
 	<dt>Callsign</dt>
 	<dd>{{.FullCallsign}} <a href="/setup/station">Change</a></dd>
@@ -34,7 +34,7 @@
 {{if eq .Draft.HATType "sx1255"}}
 <p class="hint">The hotspot will restart once to enable the SX1255's audio interface.</p>
 {{end}}
-{{if .Draft.UseWiFi}}
+{{if and .Draft.UseWiFi (not .Draft.KeepWiFi)}}
 <div class="notice">
 	<p>If your phone or computer is connected to the hotspot's own <strong>M17-Setup</strong> WiFi, it will lose that connection when the hotspot joins “{{.Draft.WiFiSSID}}”. Reconnect to your usual WiFi, then open
 	<strong>http://{{.Draft.Hostname}}.local/</strong>.</p>

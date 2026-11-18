@@ -179,6 +179,39 @@ func TestFullWizard(t *testing.T) {
 	}
 }
 
+// TestRerunKeepsSavedWiFi: running the wizard on a hotspot that already
+// has its WiFi set up must not rewrite that network without its password.
+func TestRerunKeepsSavedWiFi(t *testing.T) {
+	h := newHarness(t)
+	h.fake.SetSavedWiFi("HomeNetwork")
+	c := h.client
+	h.post(c, "/setup/password", url.Values{"password": {"long-enough"}, "confirm": {"long-enough"}})
+	_, _, body := h.get(c, "/setup/network")
+	if !regexp.MustCompile(`value="HomeNetwork" checked`).MatchString(body) || !strings.Contains(body, "keep its saved password") {
+		t.Error("the saved network isn't preselected with the keep-password hint")
+	}
+	h.post(c, "/setup/network", url.Values{"connection": {"wifi"}, "wifi_ssid": {"HomeNetwork"}, "wifi_password": {""}, "wifi_country": {"US"}})
+	h.post(c, "/setup/station", url.Values{"callsign": {"N1ADJ"}, "hostname": {"m17-hotspot"}, "timezone": {"UTC"}})
+	h.post(c, "/setup/hat", url.Values{"hat_type": {"mmdvm"}})
+	h.post(c, "/setup/radio", url.Values{"rx_mhz": {"439.5"}, "power": {"10"}})
+	h.post(c, "/setup/reflector", url.Values{"reflector": {"M17-M17"}, "module": {"C"}})
+	h.post(c, "/setup/updates", url.Values{"auto_update": {"auto"}, "update_hour": {"3"}})
+	_, _, body = h.get(c, "/setup/review")
+	if !strings.Contains(body, "saved settings, unchanged") || strings.Contains(body, ", open") || strings.Contains(body, "will lose that connection") {
+		t.Errorf("review for a kept network:\n%s", body)
+	}
+	h.post(c, "/setup/review", url.Values{})
+	for _, s := range h.fake.Applied[0] {
+		if s.Key == "wifi_ssid" || s.Key == "wifi_password" {
+			t.Errorf("the saved network was rewritten: %v", h.fake.Applied[0])
+		}
+	}
+	_, _, body = h.get(c, "/setup/done")
+	if strings.Contains(body, "is joining") {
+		t.Error("the done page says the hotspot is changing networks")
+	}
+}
+
 func TestLoginRequiredOncePasswordSet(t *testing.T) {
 	h := newHarness(t)
 	h.runWizard(h.client)

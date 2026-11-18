@@ -86,6 +86,15 @@ func (f *Fake) DetectHAT(ctx context.Context) (HAT, error) {
 	return f.hat, nil
 }
 
+// SetSavedWiFi makes the fake have settings for these networks, as a
+// hotspot that is already set up does.
+func (f *Fake) SetSavedWiFi(ssids ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.current.WiFiSSIDs = ssids
+	f.current.Online = true
+}
+
 // SetHAT changes what DetectHAT reports.
 func (f *Fake) SetHAT(h HAT) {
 	f.mu.Lock()

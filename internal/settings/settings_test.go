@@ -105,6 +105,33 @@ func TestEthernetNeedsNoWiFi(t *testing.T) {
 	}
 }
 
+func TestSavedNetworkIsKept(t *testing.T) {
+	d := FromCurrent(platform.Current{WiFiSSIDs: []string{"Home"}, WiFiCountry: "GB", Online: true})
+	if !d.UseWiFi || d.WiFiSSID != "Home" || !d.KeepWiFi {
+		t.Fatalf("from current: %+v", d)
+	}
+	d.UpdateKeepWiFi()
+	got := d.Settings()
+	if slices.ContainsFunc(got, func(s platform.Setting) bool { return s.Key == "wifi_ssid" || s.Key == "wifi_password" }) {
+		t.Errorf("a saved network with no new password was rewritten: %v", got)
+	}
+	if !slices.Contains(got, platform.Setting{Key: "wifi_country", Value: "GB"}) {
+		t.Errorf("country not kept: %v", got)
+	}
+	// A new password for the saved network: rewrite it
+	d.WiFiPassword = "new-password"
+	d.UpdateKeepWiFi()
+	if d.KeepWiFi || !slices.Contains(d.Settings(), platform.Setting{Key: "wifi_password", Value: "new-password"}) {
+		t.Errorf("new password for a saved network not applied: %+v", d)
+	}
+	// Another network with no password: an open network
+	d.WiFiSSID, d.WiFiPassword = "Cafe", ""
+	d.UpdateKeepWiFi()
+	if d.KeepWiFi || !slices.Contains(d.Settings(), platform.Setting{Key: "wifi_ssid", Value: "Cafe"}) {
+		t.Errorf("a new open network wasn't written: %+v", d)
+	}
+}
+
 func TestOpenNetworkAndHexKey(t *testing.T) {
 	d := good()
 	d.WiFiPassword = ""

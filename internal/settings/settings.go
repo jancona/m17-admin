@@ -22,6 +22,12 @@ type Draft struct {
 	WiFiSSID     string `json:"wifi_ssid"`
 	WiFiPassword string `json:"wifi_password"`
 	WiFiCountry  string `json:"wifi_country"`
+	// SavedSSIDs are the networks the hotspot already has settings for.
+	// Their passwords can't be read back, so choosing one with the
+	// password left empty keeps its saved settings (KeepWiFi) rather than
+	// rewriting it as an open network.
+	SavedSSIDs []string `json:"saved_ssids"`
+	KeepWiFi   bool     `json:"keep_wifi"`
 
 	// Station
 	Callsign string `json:"callsign"` // base callsign, e.g. N1ADJ
@@ -52,6 +58,7 @@ func FromCurrent(c platform.Current) Draft {
 	d := Draft{
 		UseWiFi:     !c.Online || len(c.WiFiSSIDs) > 0,
 		WiFiCountry: c.WiFiCountry,
+		SavedSSIDs:  slices.Clone(c.WiFiSSIDs),
 		Callsign:    base,
 		Suffix:      suffix,
 		Hostname:    c.Hostname,
@@ -68,6 +75,7 @@ func FromCurrent(c platform.Current) Draft {
 	}
 	if len(c.WiFiSSIDs) > 0 {
 		d.WiFiSSID = c.WiFiSSIDs[0]
+		d.KeepWiFi = true
 	}
 	if d.WiFiCountry == "" {
 		d.WiFiCountry = "US"
@@ -136,6 +144,12 @@ var (
 	callsignRE = regexp.MustCompile(`^[A-Z0-9/.-]+$`)
 	hostnameRE = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 )
+
+// UpdateKeepWiFi decides KeepWiFi after the network step: a saved
+// network with no new password keeps its saved settings.
+func (d *Draft) UpdateKeepWiFi() {
+	d.KeepWiFi = d.UseWiFi && d.WiFiPassword == "" && slices.Contains(d.SavedSSIDs, d.WiFiSSID)
+}
 
 // FullCallsign is the callsign as the gateway uses it: "N1ADJ" or
 // "N1ADJ H".
@@ -291,9 +305,13 @@ func (d Draft) Settings() []platform.Setting {
 	add := func(k, v string) { s = append(s, platform.Setting{Key: k, Value: v}) }
 	if d.UseWiFi {
 		add("wifi_country", d.WiFiCountry)
-		add("wifi_ssid", d.WiFiSSID)
-		if d.WiFiPassword != "" {
-			add("wifi_password", d.WiFiPassword)
+		// A saved network kept as it is: rewriting it without its
+		// password (which can't be read back) would make it an open one
+		if !d.KeepWiFi {
+			add("wifi_ssid", d.WiFiSSID)
+			if d.WiFiPassword != "" {
+				add("wifi_password", d.WiFiPassword)
+			}
 		}
 	}
 	add("hostname", d.Hostname)

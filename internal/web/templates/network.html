@@ -37,7 +37,7 @@
 	<label for="wifi_password">WiFi password</label>
 	<input id="wifi_password" name="wifi_password" type="password" autocomplete="off"
 		{{with index .Errors "wifi_password"}}aria-invalid="true"{{end}}>
-	<p class="hint">{{if .Draft.WiFiPassword}}Already entered: leave empty to keep it.{{else}}Leave empty for an open network.{{end}}</p>
+	<p class="hint">{{if .Draft.WiFiPassword}}Already entered: leave empty to keep it.{{else if .Draft.SavedSSIDs}}For a network the hotspot already knows, leave this empty to keep its saved password. Otherwise leave it empty only for an open network.{{else}}Leave empty for an open network.{{end}}</p>
 	{{with index .Errors "wifi_password"}}<p class="error">{{.}}</p>{{end}}
 
 	<label for="wifi_country">Country</label>
