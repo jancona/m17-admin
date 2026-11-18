@@ -38,3 +38,7 @@ go test -race ./...
 ```
 
 The web tests run whole wizards through the HTTP handlers: the order of the steps, login and logout, CSRF rejection, a new session ID at login, validation errors that keep what was typed, warnings that don't block, the applied settings, and that the WiFi password isn't kept or shown afterwards.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
