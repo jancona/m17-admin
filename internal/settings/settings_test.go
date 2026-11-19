@@ -58,8 +58,8 @@ func TestChecksReject(t *testing.T) {
 		{"bad hat", func(d *Draft) { d.HATType = "rtl-sdr" }, func(d Draft) Problems { return d.CheckHAT() }, "hat_type", false},
 		{"no frequency", func(d *Draft) { d.RXFrequency = math.NaN() }, radioCheck, "rx_mhz", false},
 		{"frequency in Hz", func(d *Draft) { d.RXFrequency = 439500000 }, radioCheck, "rx_mhz", false},
-		{"outside the gateway's range", func(d *Draft) { d.RXFrequency = 460.0 }, radioCheck, "rx_mhz", false},
-		{"2 m", func(d *Draft) { d.RXFrequency = 145.0 }, radioCheck, "rx_mhz", false},
+		{"outside the CC1200 HAT's range", func(d *Draft) { d.HATType = "cc1200"; d.RXFrequency = 460.0 }, radioCheck, "rx_mhz", false},
+		{"2 m on an SX1255", func(d *Draft) { d.HATType = "sx1255"; d.RXFrequency = 145.0 }, radioCheck, "rx_mhz", false},
 		{"duplex same frequency", func(d *Draft) { d.Duplex = true }, radioCheck, "tx_mhz", false},
 		{"cc1200 power", func(d *Draft) { d.HATType = "cc1200"; d.Power = 15 }, radioCheck, "power", false},
 		{"unknown reflector", func(d *Draft) { d.Reflector = "M17-NOPE" }, reflCheck, "reflector", false},
@@ -286,5 +286,34 @@ func TestPowerForOtherHATs(t *testing.T) {
 	d.HATType, d.Power = "cc1200", 14
 	if p := d.CheckRadio(); !p.OK() || power(d) != "14" {
 		t.Errorf("CC1200 at 14 dBm: %v, %s", p.Errors, power(d))
+	}
+}
+
+func TestFrequencyPerHAT(t *testing.T) {
+	for _, tc := range []struct {
+		hat       string
+		mhz       float64
+		err, warn bool
+	}{
+		{"cc1200", 439.5, false, false},
+		{"cc1200", 450, false, false},
+		{"cc1200", 460, true, false},
+		{"cc1200", 145.5, true, false},
+		{"sx1255", 400, false, true}, // outside the amateur bands
+		{"sx1255", 460, false, true}, // outside the amateur bands
+		{"sx1255", 510.1, true, false},
+		{"sx1255", 145.5, true, false},
+		{"mmdvm", 145.5, false, false},
+		{"mmdvm", 222.5, false, false},
+		{"mmdvm", 915, false, false},
+		{"mmdvm", 50.5, false, true}, // MMDVM_HS refuses it; repeater boards don't
+		{"mmdvm", 1296, false, true},
+	} {
+		d := good()
+		d.HATType, d.RXFrequency, d.Duplex = tc.hat, tc.mhz, false
+		p := d.CheckRadio()
+		if (p.Errors["rx_mhz"] != "") != tc.err || (p.Warnings["rx_mhz"] != "") != tc.warn {
+			t.Errorf("%s at %g MHz: errors %v, warnings %v", tc.hat, tc.mhz, p.Errors, p.Warnings)
+		}
 	}
 }

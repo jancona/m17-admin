@@ -310,9 +310,9 @@ func TestValidationErrorsKeepInput(t *testing.T) {
 	h.expectRedirect(code, loc, "/setup/station")
 }
 
-// m17-gateway refuses to start with a frequency outside 420-450 MHz or a
-// power outside -16 to 14 dBm, whatever the HAT, so the wizard mustn't
-// accept them. Power is only asked for the CC1200 HAT.
+// m17-gateway refuses to start with a frequency or power its modem can't
+// use, so the wizard mustn't accept them. Power is only asked for the
+// CC1200 HAT; MMDVM boards check the frequency themselves.
 func TestRadioMatchesGatewayLimits(t *testing.T) {
 	h := newHarness(t)
 	c := h.client
@@ -321,12 +321,11 @@ func TestRadioMatchesGatewayLimits(t *testing.T) {
 	if strings.Contains(body, `name="power"`) {
 		t.Error("power is asked for an MMDVM board")
 	}
-	code, _, body := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"460.0"}})
-	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "between 420 and 450 MHz") {
-		t.Errorf("460 MHz: status %d", code)
-	}
+	// MMDVM boards check the frequency themselves, so 2 m is accepted
+	code, loc, _ := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"145.5"}})
+	h.expectRedirect(code, loc, "/setup/reflector")
 	// A repeater's "30" (ignored by MMDVM boards) can't reach the gateway
-	code, loc, _ := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"446.45"}, "duplex": {"on"}, "tx_mhz": {"441.45"}, "power": {"30"}})
+	code, loc, _ = h.post(c, "/setup/radio", url.Values{"rx_mhz": {"446.45"}, "duplex": {"on"}, "tx_mhz": {"441.45"}, "power": {"30"}})
 	h.expectRedirect(code, loc, "/setup/reflector")
 
 	h2 := newHarness(t)
@@ -334,6 +333,10 @@ func TestRadioMatchesGatewayLimits(t *testing.T) {
 	h2.runWizardTo(c2, "/setup/hat")
 	h2.post(c2, "/setup/hat", url.Values{"hat_type": {"cc1200"}})
 	h2.post(c2, "/setup/firmware", url.Values{"action": {"continue"}})
+	code, _, body = h2.post(c2, "/setup/radio", url.Values{"rx_mhz": {"460.0"}, "power": {"10"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "between 420 and 450 MHz") {
+		t.Errorf("CC1200 at 460 MHz: status %d", code)
+	}
 	code, _, body = h2.post(c2, "/setup/radio", url.Values{"rx_mhz": {"439.5"}, "power": {"20"}})
 	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "between -16 and 14 dBm") {
 		t.Errorf("CC1200 at 20 dBm: status %d", code)

@@ -229,6 +229,15 @@ var bands = []band{
 	{"23 cm", 1240, 1300},
 }
 
+func inHSBand(mhz float64) bool {
+	for _, b := range hsBands {
+		if mhz >= b[0] && mhz <= b[1] {
+			return true
+		}
+	}
+	return false
+}
+
 func bandOf(mhz float64) string {
 	for _, b := range bands {
 		if mhz >= b.low && mhz <= b.top {
@@ -238,18 +247,34 @@ func bandOf(mhz float64) string {
 	return ""
 }
 
-// What m17-gateway accepts. Its checks are the CC1200 HAT's, but it
-// applies them whatever the HAT: a value outside them stops the gateway
-// from starting ("Bad configuration").
+// What m17-gateway (0.9.5 and later) accepts for each HAT: a value
+// outside these stops the gateway from starting ("Bad configuration").
 const (
-	GatewayMinMHz = 420.0
-	GatewayMaxMHz = 450.0
-	MinPower      = -16 // dBm
-	MaxPower      = 14
-	// DefaultPower is written for HATs that don't use the setting (it must
-	// still be in range)
+	CC1200MinMHz = 420.0 // the CC1200 HAT's filters
+	CC1200MaxMHz = 450.0
+	SX1255MinMHz = 400.0 // the SX1255's datasheet range
+	SX1255MaxMHz = 510.0
+	MinPower     = -16 // dBm, the CC1200 HAT's range
+	MaxPower     = 14
+	// DefaultPower is written for HATs that don't use the setting
 	DefaultPower = 10
 )
+
+// hsBands are the bands MMDVM_HS hotspot firmware accepts; it refuses
+// other frequencies. MMDVM repeater boards ignore the frequency.
+var hsBands = [][2]float64{{144, 148}, {219, 225}, {420, 475}, {842, 950}}
+
+// freqRange is the frequency range the HAT accepts, in MHz, and the
+// HAT's name for messages; ok is false when the gateway doesn't check it.
+func (d Draft) freqRange() (lo, hi float64, name string, ok bool) {
+	switch d.HATType {
+	case "cc1200":
+		return CC1200MinMHz, CC1200MaxMHz, "The CC1200 HAT", true
+	case "sx1255":
+		return SX1255MinMHz, SX1255MaxMHz, "The SX1255 HAT", true
+	}
+	return 0, 0, "", false
+}
 
 // UsesPower reports whether the HAT's transmit power is set in
 // m17-gateway's configuration. Only the CC1200 HAT's is: MMDVM boards
@@ -259,14 +284,17 @@ func (d Draft) UsesPower() bool { return d.HATType == "cc1200" }
 // CheckRadio checks the radio step.
 func (d Draft) CheckRadio() Problems {
 	p := newProblems()
+	lo, hi, hatName, hasRange := d.freqRange()
 	check := func(field string, mhz float64) {
 		switch {
 		case math.IsNaN(mhz) || mhz <= 0:
 			p.Errors[field] = "Enter the frequency in MHz, e.g. 439.500."
-		case mhz < 100 || mhz > 6000:
+		case mhz < 1 || mhz > 6000: // e.g. GHz or kHz typed by mistake
 			p.Errors[field] = "That doesn't look like a frequency in MHz."
-		case mhz < GatewayMinMHz || mhz > GatewayMaxMHz:
-			p.Errors[field] = "m17-gateway works between 420 and 450 MHz for now."
+		case hasRange && (mhz < lo || mhz > hi):
+			p.Errors[field] = fmt.Sprintf("%s works between %g and %g MHz.", hatName, lo, hi)
+		case d.HATType == "mmdvm" && !inHSBand(mhz):
+			p.Warnings[field] = "MMDVM_HS hotspot boards work on 144-148, 219-225, 420-475 and 842-950 MHz, and refuse other frequencies. Repeater boards don't mind."
 		case bandOf(mhz) == "":
 			p.Warnings[field] = "This is outside the usual amateur bands. Check it's allowed where you are."
 		}
@@ -409,7 +437,7 @@ func (d Draft) Settings() []platform.Setting {
 	}
 	power := d.Power
 	if !d.UsesPower() && (power < MinPower || power > MaxPower) {
-		power = DefaultPower // unused, but the gateway checks it
+		power = DefaultPower // unused; older gateways checked it anyway
 	}
 	add("power", strconv.Itoa(power))
 	if d.Reflector != "" {
