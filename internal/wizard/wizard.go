@@ -32,6 +32,7 @@ var Steps = []Step{
 	{"radio", "Frequency"},
 	{"reflector", "Reflector"},
 	{"updates", "Updates"},
+	{"ssh", "SSH"},
 	{"review", "Review"},
 }
 

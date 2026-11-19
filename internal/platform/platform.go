@@ -62,6 +62,10 @@ type Current struct {
 	Module      string
 	AutoUpdate  string // auto, notify or off
 	UpdateHour  int
+	// SSHPasswordLogins is true when SSH accepts passwords, not only keys
+	SSHPasswordLogins bool
+	// SSHKeys is the number of SSH keys the m17 user has; -1 if unknown
+	SSHKeys int
 	// Online is true when the hotspot has a network connection (Ethernet,
 	// or WiFi with an address), false while the setup access point is up.
 	Online bool

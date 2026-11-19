@@ -165,6 +165,21 @@ func (a *Alpine) Current(ctx context.Context) (Current, error) {
 			}
 		}
 	}
+	// Older system versions' helpers don't have ssh-status: unknown
+	c.SSHKeys = -1
+	if out, err := a.helper(ctx, "", "ssh-status"); err == nil {
+		for _, line := range strings.Split(out, "\n") {
+			k, v, _ := strings.Cut(line, "=")
+			switch k {
+			case "password_logins":
+				c.SSHPasswordLogins = v == "true"
+			case "keys":
+				if n, err := strconv.Atoi(v); err == nil {
+					c.SSHKeys = n
+				}
+			}
+		}
+	}
 	if out, err := a.helper(ctx, "", "update-policy"); err == nil {
 		for _, line := range strings.Split(out, "\n") {
 			k, v, _ := strings.Cut(line, "=")

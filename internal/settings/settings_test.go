@@ -221,3 +221,40 @@ func TestFromCurrent(t *testing.T) {
 		t.Errorf("defaults: %q %q", d.WiFiCountry, d.AutoUpdate)
 	}
 }
+
+func TestSSH(t *testing.T) {
+	d := good()
+	if p := d.CheckSSH(""); !p.OK() || p.Warnings["ssh_key"] == "" {
+		t.Errorf("no key, no passwords: want only a warning, got %v", p)
+	}
+	d.SSHKey = NormalizeSSHKey(" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGb0Xv3mQ0x0aP1l2n3o4p5\nq6r7s8t9u0v1w2x3y4z5A me@pc\r\n")
+	if p := d.CheckSSH(""); !p.OK() || len(p.Warnings) != 0 {
+		t.Errorf("a key wrapped across lines: %v", p)
+	}
+	for _, bad := range []string{"AAAAC3Nza", "ssh-ed25519", "ssh-dss AAAAB3NzaC1kc3M= old"} {
+		d.SSHKey = bad
+		if d.CheckSSH("").OK() {
+			t.Errorf("accepted key %q", bad)
+		}
+	}
+	d.SSHKey = ""
+	d.SSHPasswordWas, d.SSHPasswordLogins = true, true
+	if !d.CheckSSH("").OK() {
+		t.Error("already allowed: a new password shouldn't be required")
+	}
+	if slices.ContainsFunc(d.Settings(), func(s platform.Setting) bool { return s.Key == "enable_ssh_password" }) {
+		t.Error("enable_ssh_password sent without a change")
+	}
+	d.SSHPasswordLogins = false
+	if !slices.Contains(d.Settings(), platform.Setting{Key: "enable_ssh_password", Value: "false"}) {
+		t.Error("turning password logins off isn't sent")
+	}
+	d.UserPassword = "short"
+	if d.CheckSSH("short").OK() {
+		t.Error("short password accepted")
+	}
+	d.UserPassword = "long-enough"
+	if d.CheckSSH("different").Errors["user_confirm"] == "" {
+		t.Error("mismatched confirmation accepted")
+	}
+}

@@ -21,6 +21,9 @@
 	<dt>Updates</dt>
 	<dd>{{if eq .AutoUpdate "auto"}}Automatic{{else if eq .AutoUpdate "notify"}}Check only{{else}}Off{{end}}{{if ne .AutoUpdate "off"}}, at {{printf "%02d:00" .UpdateHour}}{{end}}
 		<a href="/setup/updates">Change</a></dd>
+	<dt>SSH</dt>
+	<dd>{{if .SSHKey}}Add a key{{else if gt .SSHKeys 0}}{{.SSHKeys}} key{{if gt .SSHKeys 1}}s{{end}}{{else}}No keys{{end}}, {{if .SSHPasswordLogins}}password logins allowed{{else}}keys only{{end}}{{if .UserPassword}}, new password for m17{{end}}
+		<a href="/setup/ssh">Change</a></dd>
 </dl>
 {{end}}
 

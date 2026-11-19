@@ -468,6 +468,16 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 			d.UpdateHour = -1
 		}
 		probs = d.CheckUpdates()
+	case "ssh":
+		d.SSHKey = settings.NormalizeSSHKey(f.Get("ssh_key"))
+		d.SSHPasswordLogins = f.Get("ssh_password_logins") == "on"
+		// An empty password field keeps one entered before
+		if pw := f.Get("user_password"); pw != "" {
+			d.UserPassword = pw
+			probs = d.CheckSSH(f.Get("user_confirm"))
+		} else {
+			probs = d.CheckSSH(d.UserPassword)
+		}
 	case "review":
 		s.apply(w, r, sess, st)
 		return
@@ -497,7 +507,7 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 func (s *Server) allWarnings(ctx context.Context, d settings.Draft) map[string]string {
 	w := map[string]string{}
 	zones, _ := s.plat.TimeZones(ctx)
-	for _, p := range []settings.Problems{d.CheckStation(zones), d.CheckRadio()} {
+	for _, p := range []settings.Problems{d.CheckStation(zones), d.CheckRadio(), d.CheckSSH(d.UserPassword)} {
 		for k, v := range p.Warnings {
 			w[k] = v
 		}
@@ -518,6 +528,7 @@ func (s *Server) apply(w http.ResponseWriter, r *http.Request, sess *auth.Sessio
 		s.log.Warn("clearing the wizard state", "err", err)
 	}
 	st.Draft.WiFiPassword = ""
+	st.Draft.UserPassword = ""
 	s.mu.Lock()
 	s.lastResult = &appliedResult{Result: res, Draft: st.Draft, at: time.Now()}
 	s.mu.Unlock()

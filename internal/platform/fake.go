@@ -43,6 +43,7 @@ func NewFake() *Fake {
 			AutoUpdate:  "auto",
 			UpdateHour:  3,
 			Online:      false,
+			SSHKeys:     0,
 		},
 		networks: []Network{
 			{SSID: "HomeNetwork", Signal: -48, Secured: true, Frequency: 2437},
@@ -175,6 +176,10 @@ func (f *Fake) Apply(ctx context.Context, settings []Setting) (Result, error) {
 			f.current.Module = s.Value
 		case s.Key == "auto_update":
 			f.current.AutoUpdate = s.Value
+		case s.Key == "ssh_key":
+			f.current.SSHKeys++
+		case s.Key == "enable_ssh_password":
+			f.current.SSHPasswordLogins = s.Value == "true"
 		}
 	}
 	if ssids != nil {

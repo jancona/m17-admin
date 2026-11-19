@@ -104,6 +104,14 @@ func (h *harness) expectRedirect(code int, loc, wantLoc string) {
 // runWizard completes every step and applies the settings.
 func (h *harness) runWizard(c *http.Client) {
 	h.t.Helper()
+	h.runWizardTo(c, "/setup/review")
+	code, loc, _ := h.post(c, "/setup/review", url.Values{})
+	h.expectRedirect(code, loc, "/setup/done")
+}
+
+// runWizardTo fills in the steps before stop (a path).
+func (h *harness) runWizardTo(c *http.Client, stop string) {
+	h.t.Helper()
 	steps := []struct {
 		path string
 		form url.Values
@@ -115,8 +123,12 @@ func (h *harness) runWizard(c *http.Client) {
 		{"/setup/radio", url.Values{"rx_mhz": {"439.500"}, "power": {"10"}}},
 		{"/setup/reflector", url.Values{"reflector": {"M17-XOR"}, "module": {"b"}}},
 		{"/setup/updates", url.Values{"auto_update": {"notify"}, "update_hour": {"4"}}},
+		{"/setup/ssh", url.Values{"ssh_key": {"  ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGb0Xv3mQ0x0aP1l2n3o4p5q6r7s8t9u0v1w2x3y4z5A jim@mac\n"}}},
 	}
 	for i, s := range steps {
+		if s.path == stop {
+			return
+		}
 		code, loc, body := h.post(c, s.path, s.form)
 		next := "/setup/review"
 		if i+1 < len(steps) {
@@ -126,8 +138,6 @@ func (h *harness) runWizard(c *http.Client) {
 			h.t.Fatalf("%s: status %d, redirect %q, want %q\n%s", s.path, code, loc, next, body)
 		}
 	}
-	code, loc, _ := h.post(c, "/setup/review", url.Values{})
-	h.expectRedirect(code, loc, "/setup/done")
 }
 
 func TestFullWizard(t *testing.T) {
@@ -158,6 +168,7 @@ func TestFullWizard(t *testing.T) {
 		{Key: "module", Value: "B"},
 		{Key: "auto_update", Value: "notify"},
 		{Key: "update_hour", Value: "4"},
+		{Key: "ssh_key", Value: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGb0Xv3mQ0x0aP1l2n3o4p5q6r7s8t9u0v1w2x3y4z5A jim@mac"},
 	} {
 		if !slices.Contains(got, want) {
 			t.Errorf("applied settings lack %v: %v", want, got)
@@ -196,6 +207,7 @@ func TestRerunKeepsSavedWiFi(t *testing.T) {
 	h.post(c, "/setup/radio", url.Values{"rx_mhz": {"439.5"}, "power": {"10"}})
 	h.post(c, "/setup/reflector", url.Values{"reflector": {"M17-M17"}, "module": {"C"}})
 	h.post(c, "/setup/updates", url.Values{"auto_update": {"auto"}, "update_hour": {"3"}})
+	h.post(c, "/setup/ssh", url.Values{})
 	_, _, body = h.get(c, "/setup/review")
 	if !strings.Contains(body, "saved settings, unchanged") || strings.Contains(body, ", open") || strings.Contains(body, "will lose that connection") {
 		t.Errorf("review for a kept network:\n%s", body)
@@ -307,6 +319,7 @@ func TestOutOfBandFrequencyIsAWarning(t *testing.T) {
 	h.expectRedirect(code, loc, "/setup/reflector")
 	h.post(c, "/setup/reflector", url.Values{"reflector": {""}, "module": {"A"}})
 	h.post(c, "/setup/updates", url.Values{"auto_update": {"auto"}, "update_hour": {"3"}})
+	h.post(c, "/setup/ssh", url.Values{})
 	_, _, body := h.get(c, "/setup/review")
 	if !strings.Contains(body, "outside the usual amateur bands") {
 		t.Error("review page doesn't repeat the band warning")
@@ -371,5 +384,40 @@ func TestCaptivePortalAndHeaders(t *testing.T) {
 	code, _, css := h.get(h.client, "/setup/static/style.css")
 	if code != 200 || !strings.Contains(css, "prefers-color-scheme") {
 		t.Errorf("static CSS: %d", code)
+	}
+}
+
+// TestSSHStep: password logins need a new m17 password, and the password
+// is applied but not kept afterwards.
+func TestSSHStep(t *testing.T) {
+	h := newHarness(t)
+	c := h.client
+	h.runWizardTo(c, "/setup/ssh")
+
+	code, _, body := h.post(c, "/setup/ssh", url.Values{"ssh_password_logins": {"on"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "the default one is published") {
+		t.Errorf("password logins without a new password: %d\n%s", code, body)
+	}
+	code, _, body = h.post(c, "/setup/ssh", url.Values{"ssh_password_logins": {"on"}, "user_password": {"m17hotspot"}, "user_confirm": {"m17hotspot"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "default password") {
+		t.Errorf("the default password accepted: %d", code)
+	}
+	code, _, body = h.post(c, "/setup/ssh", url.Values{"ssh_key": {"-----BEGIN OPENSSH PRIVATE KEY-----"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "private key") {
+		t.Errorf("a private key accepted: %d", code)
+	}
+	code, loc, _ := h.post(c, "/setup/ssh", url.Values{"ssh_password_logins": {"on"}, "user_password": {"new-m17-pass"}, "user_confirm": {"new-m17-pass"}})
+	h.expectRedirect(code, loc, "/setup/review")
+	_, _, body = h.get(c, "/setup/review")
+	if !strings.Contains(body, "password logins allowed") || strings.Contains(body, "new-m17-pass") {
+		t.Errorf("review:\n%s", body)
+	}
+	code, loc, _ = h.post(c, "/setup/review", url.Values{})
+	h.expectRedirect(code, loc, "/setup/done")
+	got := h.fake.Applied[0]
+	for _, want := range []platform.Setting{{Key: "user_password", Value: "new-m17-pass"}, {Key: "enable_ssh_password", Value: "true"}} {
+		if !slices.Contains(got, want) {
+			t.Errorf("applied settings lack %v: %v", want, got)
+		}
 	}
 }

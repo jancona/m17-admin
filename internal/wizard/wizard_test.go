@@ -72,7 +72,7 @@ func TestOrder(t *testing.T) {
 	if s.FirstOpen() != "review" {
 		t.Errorf("all done: FirstOpen = %s, want review", s.FirstOpen())
 	}
-	if Next("updates") != "review" || Next("review") != "" || Prev("password") != "" || Prev("network") != "password" {
+	if Next("updates") != "ssh" || Next("ssh") != "review" || Next("review") != "" || Prev("password") != "" || Prev("network") != "password" {
 		t.Error("Next/Prev")
 	}
 	if Index("nope") != -1 || s.Reachable("nope") {

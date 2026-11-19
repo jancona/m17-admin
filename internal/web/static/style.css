@@ -88,7 +88,7 @@ code { font-size: .92em; background: var(--bg); padding: 1px 4px; border-radius:
 
 label { display: block; font-weight: 600; margin: 16px 0 4px; }
 .optional { font-weight: 400; color: var(--muted); }
-input[type=text], input:not([type]), input[type=password], input[type=number], input[type=search], select {
+input[type=text], input:not([type]), input[type=password], input[type=number], input[type=search], select, textarea {
 	width: 100%;
 	padding: 10px 12px;
 	font: inherit;
@@ -100,7 +100,7 @@ input[type=text], input:not([type]), input[type=password], input[type=number], i
 input.short, select.short { width: auto; min-width: 6em; }
 input.upper { text-transform: uppercase; }
 select[size] { padding: 4px; }
-input:focus, select:focus, button:focus-visible, a:focus-visible {
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
 	outline: 3px solid var(--focus);
 	outline-offset: 1px;
 	border-color: var(--accent);
@@ -167,3 +167,5 @@ button.link { background: none; color: var(--accent); padding: 0; font-weight: 4
 .duplex-label { display: none; }
 .js.duplex .duplex-label { display: inline; }
 .js.duplex .simplex-label { display: none; }
+
+textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; word-break: break-all; resize: vertical; }

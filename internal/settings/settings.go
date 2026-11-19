@@ -50,6 +50,16 @@ type Draft struct {
 	// Updates
 	AutoUpdate string `json:"auto_update"`
 	UpdateHour int    `json:"update_hour"`
+
+	// SSH. SSHKey is a key to add (keys already there stay); UserPassword
+	// a new password for the m17 user ("" keeps it). Like the WiFi
+	// password, UserPassword is dropped once the settings are applied.
+	SSHKey            string `json:"ssh_key"`
+	SSHPasswordLogins bool   `json:"ssh_password_logins"`
+	UserPassword      string `json:"user_password"`
+	// SSHPasswordWas is whether password logins were already allowed
+	SSHPasswordWas bool `json:"ssh_password_was"`
+	SSHKeys        int  `json:"ssh_keys"` // keys already there; -1 if unknown
 }
 
 // FromCurrent starts a draft from the hotspot's current settings.
@@ -72,6 +82,10 @@ func FromCurrent(c platform.Current) Draft {
 		Module:      c.Module,
 		AutoUpdate:  c.AutoUpdate,
 		UpdateHour:  c.UpdateHour,
+
+		SSHPasswordLogins: c.SSHPasswordLogins,
+		SSHPasswordWas:    c.SSHPasswordLogins,
+		SSHKeys:           c.SSHKeys,
 	}
 	if len(c.WiFiSSIDs) > 0 {
 		d.WiFiSSID = c.WiFiSSIDs[0]
@@ -280,6 +294,49 @@ func (d Draft) CheckUpdates() Problems {
 	return p
 }
 
+// DefaultUserPassword is the m17 user's password on a new card. It's
+// published, so it can't be the password for SSH password logins.
+const DefaultUserPassword = "m17hotspot"
+
+var sshKeyRE = regexp.MustCompile(`^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]+={0,3}( [^\r\n]*)?$`)
+
+// NormalizeSSHKey trims a pasted key: surrounding space, and line breaks
+// that phones and terminals insert into long lines.
+func NormalizeSSHKey(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.NewReplacer("\r\n", "", "\n", "", "\r", "").Replace(s)
+	return s
+}
+
+// CheckSSH checks the SSH step. confirm is the new password typed again.
+func (d Draft) CheckSSH(confirm string) Problems {
+	p := newProblems()
+	if d.SSHKey != "" {
+		switch {
+		case strings.HasPrefix(d.SSHKey, "-----BEGIN"):
+			p.Errors["ssh_key"] = "That's a private key. Paste the public key: the contents of the .pub file."
+		case !sshKeyRE.MatchString(d.SSHKey):
+			p.Errors["ssh_key"] = "That doesn't look like an SSH public key. It starts with ssh-ed25519, ssh-rsa or ecdsa-sha2-, all on one line."
+		}
+	}
+	if d.UserPassword != "" {
+		switch {
+		case utf8.RuneCountInString(d.UserPassword) < MinPasswordLength:
+			p.Errors["user_password"] = fmt.Sprintf("Use at least %d characters.", MinPasswordLength)
+		case d.UserPassword == DefaultUserPassword:
+			p.Errors["user_password"] = "That's the default password, which everyone knows. Choose another."
+		case d.UserPassword != confirm:
+			p.Errors["user_confirm"] = "The two passwords don't match."
+		}
+	} else if d.SSHPasswordLogins && !d.SSHPasswordWas {
+		p.Errors["user_password"] = "To allow password logins, set a new password: the default one is published."
+	}
+	if !d.SSHPasswordLogins && d.SSHKey == "" && d.SSHKeys == 0 {
+		p.Warnings["ssh_key"] = "Without a key or password logins, you won't be able to log in over SSH. That's fine if you don't need to."
+	}
+	return p
+}
+
 // ParseMHz reads a frequency typed in MHz ("439.5", "439,500"). It returns
 // NaN for anything that isn't a number.
 func ParseMHz(s string) float64 {
@@ -341,5 +398,16 @@ func (d Draft) Settings() []platform.Setting {
 	}
 	add("auto_update", d.AutoUpdate)
 	add("update_hour", strconv.Itoa(d.UpdateHour))
+	if d.UserPassword != "" {
+		add("user_password", d.UserPassword)
+	}
+	if d.SSHKey != "" {
+		add("ssh_key", d.SSHKey)
+	}
+	// Only when it changes: on an older system the wizard can't read the
+	// current setting, and sending the default would turn it off
+	if d.SSHPasswordLogins != d.SSHPasswordWas {
+		add("enable_ssh_password", strconv.FormatBool(d.SSHPasswordLogins))
+	}
 	return s
 }
