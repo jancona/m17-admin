@@ -10,12 +10,15 @@
 <body>
 <header class="top">
 	<div class="brand">M17 hotspot <span>setup</span></div>
-	{{if .LoggedIn}}
-	<form method="post" action="/setup/logout" class="logout">
-		<input type="hidden" name="csrf" value="{{.CSRF}}">
-		<button type="submit" class="link">Log out</button>
-	</form>
-	{{end}}
+	<div class="toplinks">
+		<a href="/">Dashboard</a>
+		{{if .LoggedIn}}
+		<form method="post" action="/setup/logout" class="logout">
+			<input type="hidden" name="csrf" value="{{.CSRF}}">
+			<button type="submit" class="link">Log out</button>
+		</form>
+		{{end}}
+	</div>
 </header>
 
 {{if .Steps}}
