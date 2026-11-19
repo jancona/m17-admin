@@ -1,9 +1,11 @@
 package wizard
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestStoreRoundTrip(t *testing.T) {
@@ -77,5 +79,41 @@ func TestOrder(t *testing.T) {
 	}
 	if Index("nope") != -1 || s.Reachable("nope") {
 		t.Error("unknown step")
+	}
+}
+
+func TestStaleStateStartsOver(t *testing.T) {
+	dir := t.TempDir()
+	st := NewStore(dir)
+	now := time.Date(2026, 11, 19, 8, 0, 0, 0, time.UTC)
+	st.Now = func() time.Time { return now }
+	s := State{Started: true}
+	s.Draft.HATType = "sx1255"
+	s.MarkDone("password")
+	if err := st.Save(s); err != nil {
+		t.Fatal(err)
+	}
+
+	now = now.Add(23 * time.Hour)
+	if got, _ := st.Load(); !got.Started {
+		t.Error("progress from 23 hours ago was dropped")
+	}
+	now = now.Add(2 * time.Hour)
+	if got, _ := st.Load(); got.Started {
+		t.Error("progress from 25 hours ago was resumed")
+	}
+	now = now.Add(-72 * time.Hour) // the clock went back
+	if got, _ := st.Load(); !got.Started {
+		t.Error("progress saved \"in the future\" was dropped")
+	}
+
+	// Saved by a wizard with other steps, or by one from before steps were recorded
+	now = time.Date(2026, 11, 19, 8, 0, 0, 0, time.UTC)
+	for _, steps := range [][]string{{"password", "network", "review"}, nil} {
+		b, _ := json.Marshal(State{Started: true, Done: []string{"password", "network"}, Steps: steps, Saved: now})
+		os.WriteFile(filepath.Join(dir, "wizard.json"), b, 0o600)
+		if got, _ := st.Load(); got.Started {
+			t.Errorf("progress saved with steps %v was resumed", steps)
+		}
 	}
 }

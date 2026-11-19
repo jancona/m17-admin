@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/jancona/m17-admin/internal/platform"
 	"github.com/jancona/m17-admin/internal/settings"
@@ -74,6 +75,11 @@ type State struct {
 	// FlashSeen is the start time of the last firmware flash whose end
 	// this wizard has seen (and asked the HAT again what it runs).
 	FlashSeen int64 `json:"flash_seen,omitempty"`
+	// Steps are the IDs of the wizard's steps when the state was saved,
+	// and Saved when: progress from another version of the wizard, or
+	// from a run left unfinished long ago, isn't resumed (see Load).
+	Steps []string  `json:"steps,omitempty"`
+	Saved time.Time `json:"saved,omitzero"`
 }
 
 // IsDone reports whether step id has been completed.
@@ -116,11 +122,37 @@ func (s *State) Reachable(id string) bool {
 type Store struct {
 	mu   sync.Mutex
 	path string
+	// MaxAge is how long unfinished progress is kept.
+	MaxAge time.Duration
+	// Now is the clock (tests replace it).
+	Now func() time.Time
 }
 
 // NewStore keeps the state in dir/wizard.json.
 func NewStore(dir string) *Store {
-	return &Store{path: filepath.Join(dir, "wizard.json")}
+	return &Store{path: filepath.Join(dir, "wizard.json"), MaxAge: 24 * time.Hour, Now: time.Now}
+}
+
+func stepIDs() []string {
+	ids := make([]string, len(Steps))
+	for i, s := range Steps {
+		ids[i] = s.ID
+	}
+	return ids
+}
+
+// stale reports whether saved progress shouldn't be resumed: it was made
+// with other steps (a new version of the wizard would otherwise open at
+// its new step, with a draft the user filled in for the old one), or it
+// was left unfinished more than MaxAge ago, so its draft may no longer
+// match the hotspot's settings. The state lives on /data, so it outlasts
+// system updates. A save time in the future (the clock was set back) is
+// not stale.
+func (st *Store) stale(s State) bool {
+	if !slices.Equal(s.Steps, stepIDs()) || s.Saved.IsZero() {
+		return true
+	}
+	return st.Now().Sub(s.Saved) > st.MaxAge
 }
 
 // Load returns the saved state, or an empty one.
@@ -139,6 +171,9 @@ func (st *Store) Load() (State, error) {
 		// A damaged file: start again rather than locking the user out
 		return State{}, nil
 	}
+	if st.stale(s) {
+		return State{}, nil
+	}
 	return s, nil
 }
 
@@ -146,6 +181,8 @@ func (st *Store) Load() (State, error) {
 func (st *Store) Save(s State) error {
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	s.Steps = stepIDs()
+	s.Saved = st.Now()
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err

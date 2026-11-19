@@ -539,3 +539,24 @@ func (h *harness) csrf(c *http.Client) string {
 	}
 	return m[1]
 }
+
+// Progress saved by an older wizard (without the firmware step) isn't
+// resumed: it would open at the new step with that run's draft.
+func TestOldProgressNotResumed(t *testing.T) {
+	h := newHarness(t)
+	c := h.client
+	h.post(c, "/setup/password", url.Values{"password": {"long-enough"}, "confirm": {"long-enough"}})
+	old := `{"draft":{"hat_type":"sx1255","callsign":"N1ADJ"},"started":true,
+		"done":["password","network","station","hat","radio","reflector","updates","ssh"]}`
+	if err := os.WriteFile(filepath.Join(h.dir, "wizard.json"), []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, loc, _ := h.get(c, "/setup/")
+	if loc != "/setup/password" {
+		t.Errorf("old progress resumed at %s", loc)
+	}
+	_, loc, _ = h.get(c, "/setup/firmware")
+	if loc != "/setup/password" {
+		t.Errorf("firmware step reachable from old progress (redirect %q)", loc)
+	}
+}
