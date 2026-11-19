@@ -67,6 +67,33 @@
 			updateDuplex();
 		}
 
+		// Passwords typed twice: say whether they match as they're typed.
+		// A "don't match" message from the last submit goes away once
+		// either field changes, so it isn't left on screen for values that
+		// do match.
+		document.querySelectorAll("input[data-confirms]").forEach(function (confirm) {
+			var first = document.getElementById(confirm.getAttribute("data-confirms"));
+			if (!first) return;
+			var status = document.createElement("p");
+			status.className = "hint";
+			status.setAttribute("aria-live", "polite");
+			var err = document.getElementById(confirm.id + "-err");
+			if (err) err.insertAdjacentElement("afterend", status);
+			else confirm.insertAdjacentElement("afterend", status);
+			var update = function () {
+				if (err) {
+					err.hidden = true;
+					confirm.removeAttribute("aria-invalid");
+				}
+				if (confirm.value === "") status.textContent = "";
+				else if (confirm.value === first.value) status.textContent = "✓ The passwords match.";
+				else if (confirm.value.length >= first.value.length) status.textContent = "The passwords don't match.";
+				else status.textContent = "";
+			};
+			first.addEventListener("input", update);
+			confirm.addEventListener("input", update);
+		});
+
 		// Reflector: filter the list as you type. The chosen reflector is
 		// never hidden, so what gets submitted is always visible.
 		document.querySelectorAll("input[data-filter]").forEach(function (input) {

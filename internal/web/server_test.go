@@ -560,3 +560,25 @@ func TestOldProgressNotResumed(t *testing.T) {
 		t.Errorf("firmware step reachable from old progress (redirect %q)", loc)
 	}
 }
+
+// After "don't match", the form doesn't claim a new password is set, and
+// says whether the two fields match as they're typed (app.js).
+func TestSSHPasswordMismatch(t *testing.T) {
+	h := newHarness(t)
+	c := h.client
+	h.runWizardTo(c, "/setup/ssh")
+	code, _, body := h.post(c, "/setup/ssh", url.Values{"ssh_password_logins": {"on"},
+		"user_password": {"radiotest1"}, "user_confirm": {"radiotest2"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "The two passwords don") {
+		t.Fatalf("mismatch: %d", code)
+	}
+	if strings.Contains(body, "A new password is set") {
+		t.Error("the rejected password is shown as set")
+	}
+	if !strings.Contains(body, `data-confirms="user_password"`) || !strings.Contains(body, `id="user_confirm-err"`) {
+		t.Error("the live match check can't find its fields")
+	}
+	code, loc, _ := h.post(c, "/setup/ssh", url.Values{"ssh_password_logins": {"on"},
+		"user_password": {"radiotest1"}, "user_confirm": {"radiotest1"}})
+	h.expectRedirect(code, loc, "/setup/review")
+}

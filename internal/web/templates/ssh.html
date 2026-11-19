@@ -18,8 +18,8 @@
 	{{with index .Errors "user_password"}}<p class="error">{{.}}</p>{{end}}
 
 	<label for="user_confirm">Type it again</label>
-	<input id="user_confirm" name="user_confirm" type="password" autocomplete="new-password">
-	{{with index .Errors "user_confirm"}}<p class="error">{{.}}</p>{{end}}
+	<input id="user_confirm" name="user_confirm" type="password" autocomplete="new-password" data-confirms="user_password">
+	{{with index .Errors "user_confirm"}}<p class="error" id="user_confirm-err">{{.}}</p>{{end}}
 
 	<div class="actions">
 		{{if .Prev}}<a class="back" href="/setup/{{.Prev}}">Back</a>{{end}}

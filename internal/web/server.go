@@ -489,6 +489,11 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 		if pw := f.Get("user_password"); pw != "" {
 			d.UserPassword = pw
 			probs = d.CheckSSH(f.Get("user_confirm"))
+			if probs.Errors["user_password"] != "" || probs.Errors["user_confirm"] != "" {
+				// A rejected password isn't kept: the form then mustn't
+				// say a new one is set
+				d.UserPassword = st.Draft.UserPassword
+			}
 		} else {
 			probs = d.CheckSSH(d.UserPassword)
 		}
