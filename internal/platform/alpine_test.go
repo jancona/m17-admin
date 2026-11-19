@@ -60,6 +60,10 @@ case "$1" in
 		echo "reboot: false"
 		echo "network: true"
 		echo "gateway: true" ;;
+	firmware-flash|firmware-status)
+		[ -f "`+dir+`/fw-helper" ] || { echo "admin-helper: unknown command: $1" >&2; exit 2; }
+		[ "$1" = firmware-status ] && printf 'state=running\nfile=mmdvm_hs/MMDVM_HS_Hat.bin\nstarted=1795047609\nlog: Flashing mmdvm_hs/MMDVM_HS_Hat.bin\nlog: Wrote and verified address 0x08000100 (1.25%%)\n'
+		exit 0 ;;
 	*) echo "unknown command" >&2; exit 2 ;;
 esac
 `)
@@ -232,5 +236,43 @@ func TestAlpineApply(t *testing.T) {
 	}
 	if _, err := a.Apply(context.Background(), []Setting{{Key: "callsign", Value: "X\nuser_password=evil"}}); err == nil {
 		t.Error("a value with a line break was passed on")
+	}
+}
+
+func TestAlpineFirmware(t *testing.T) {
+	a, dir := newTestAlpine(t)
+	ctx := context.Background()
+
+	// A helper from before firmware flashing
+	if err := a.FlashFirmware(ctx, "mmdvm_hs/MMDVM_HS_Hat.bin"); err != ErrFlashUnsupported {
+		t.Errorf("old helper: FlashFirmware = %v, want ErrFlashUnsupported", err)
+	}
+	if st, err := a.FlashStatus(ctx); err != nil || st.State != "" {
+		t.Errorf("old helper: FlashStatus = %+v, %v", st, err)
+	}
+
+	os.WriteFile(filepath.Join(dir, "fw-helper"), nil, 0o644)
+	if err := a.FlashFirmware(ctx, "mmdvm_hs/MMDVM_HS_Hat.bin"); err != nil {
+		t.Fatal(err)
+	}
+	if c := calls(t, dir); c[len(c)-1] != "firmware-flash mmdvm_hs/MMDVM_HS_Hat.bin" {
+		t.Errorf("helper called with %q", c[len(c)-1])
+	}
+	st, err := a.FlashStatus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !st.Running() || st.File != "mmdvm_hs/MMDVM_HS_Hat.bin" || st.Started != 1795047609 || len(st.Log) != 2 || !strings.Contains(st.Log[1], "1.25%") {
+		t.Errorf("FlashStatus = %+v", st)
+	}
+
+	// Firmware files are read directly
+	fwDir := filepath.Join(dir, "firmware", "cc1200")
+	os.MkdirAll(fwDir, 0o755)
+	os.WriteFile(filepath.Join(fwDir, "CC1200_HAT-fw.bin"), []byte("\x00CC1200-HAT 420-450 MHz\nFW v2.3 by Wojciech SP5WWP\x00"), 0o644)
+	a.FirmwareDir = filepath.Join(dir, "firmware")
+	imgs, err := a.FirmwareImages(ctx)
+	if err != nil || len(imgs) != 1 || imgs[0].Ident != "CC1200-HAT 420-450 MHz / FW v2.3 by Wojciech SP5WWP" {
+		t.Errorf("FirmwareImages = %+v, %v", imgs, err)
 	}
 }

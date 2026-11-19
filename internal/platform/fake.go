@@ -6,8 +6,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/jancona/m17-admin/internal/firmware"
 )
 
 // Fake is an in-memory Platform for tests and for running the UI on a
@@ -25,6 +28,19 @@ type Fake struct {
 	Applied [][]Setting
 	// ApplyWarnings, if set, are returned by the next Apply.
 	ApplyWarnings []string
+
+	// Firmware is what FirmwareImages returns.
+	Firmware []firmware.Image
+	// Flashed records every FlashFirmware call, for tests.
+	Flashed []string
+	// FlashTime is how long a simulated flash takes; FlashFails makes it
+	// fail. With FlashTime 0 a flash finishes at once.
+	FlashTime  time.Duration
+	FlashFails bool
+	// FlashErr, if set, is returned by FlashFirmware.
+	FlashErr error
+	flash    FlashStatus
+	flashEnd time.Time
 }
 
 // NewFake returns a Fake in its unconfigured state.
@@ -53,8 +69,15 @@ func NewFake() *Fake {
 		},
 		hat: HAT{
 			Type:  "mmdvm",
-			Ident: "MMDVM_HS_Dual_Hat-v1.6.1 20261116 14.7456MHz dual ADF7021 FW by CA6JAU (M17)",
+			Ident: "MMDVM_HS_Dual_Hat-v1.5.2 20201108 14.7456MHz dual ADF7021 FW by CA6JAU GitID #89daa20",
 			Speed: 115200,
+		},
+		Firmware: []firmware.Image{
+			{Name: "cc1200/CC1200_HAT-fw.bin", Ident: "CC1200-HAT 420-450 MHz / FW v2.3 by Wojciech SP5WWP"},
+			{Name: "mmdvm/Repeater-Builder_v3.bin", Ident: "MMDVM 20251014 12.0000 MHz GitID #9267a90"},
+			{Name: "mmdvm/Repeater-Builder_v4.bin", Ident: "MMDVM RB_STM32_DVM(446) 20251014 12.0000 MHz GitID #9267a90"},
+			{Name: "mmdvm_hs/MMDVM_HS_Dual_Hat.bin", Ident: "MMDVM_HS_Dual_Hat-v1.6.1 20261116 14.7456MHz dual ADF7021 FW by CA6JAU (M17) GitID #02e5646"},
+			{Name: "mmdvm_hs/MMDVM_HS_Hat.bin", Ident: "MMDVM_HS_Hat-v1.6.1 20261116 14.7456MHz ADF7021 FW by CA6JAU (M17) GitID #02e5646"},
 		},
 		reflectors: []Reflector{
 			{Name: "M17-M17", Server: "107.191.121.105", Port: 17000},
@@ -101,6 +124,67 @@ func (f *Fake) SetHAT(h HAT) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.hat = h
+}
+
+func (f *Fake) FirmwareImages(ctx context.Context) ([]firmware.Image, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]firmware.Image(nil), f.Firmware...), nil
+}
+
+func (f *Fake) FlashFirmware(ctx context.Context, name string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.FlashErr != nil {
+		return f.FlashErr
+	}
+	f.finishFlash()
+	if f.flash.Running() {
+		return errors.New("a flash is already running")
+	}
+	var ident string
+	for _, img := range f.Firmware {
+		if img.Name == name {
+			ident = img.Ident
+		}
+	}
+	if ident == "" {
+		return errors.New("no firmware file " + name)
+	}
+	f.Flashed = append(f.Flashed, name)
+	f.flash = FlashStatus{State: "running", File: name, Started: time.Now().Unix(), Log: []string{"Flashing " + name}}
+	f.flashEnd = time.Now().Add(f.FlashTime)
+	f.finishFlash()
+	return nil
+}
+
+// finishFlash ends a simulated flash whose time is up: the HAT then
+// reports the new firmware.
+func (f *Fake) finishFlash() {
+	if !f.flash.Running() || time.Now().Before(f.flashEnd) {
+		return
+	}
+	if f.FlashFails {
+		f.flash.State = "failed"
+		f.flash.Log = append(f.flash.Log, "Failed to init device.")
+		return
+	}
+	f.flash.State = "ok"
+	f.flash.Log = append(f.flash.Log, "Done: "+f.flash.File+" written and verified")
+	for _, img := range f.Firmware {
+		if img.Name == f.flash.File {
+			f.hat.Ident = img.Ident
+		}
+	}
+}
+
+func (f *Fake) FlashStatus(ctx context.Context) (FlashStatus, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.finishFlash()
+	s := f.flash
+	s.Log = append([]string(nil), s.Log...)
+	return s, nil
 }
 
 func (f *Fake) Reflectors(ctx context.Context) ([]Reflector, error) {

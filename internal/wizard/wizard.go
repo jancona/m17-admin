@@ -29,6 +29,7 @@ var Steps = []Step{
 	{"network", "Network"},
 	{"station", "Station"},
 	{"hat", "Radio HAT"},
+	{"firmware", "Firmware"},
 	{"radio", "Frequency"},
 	{"reflector", "Reflector"},
 	{"updates", "Updates"},
@@ -70,6 +71,9 @@ type State struct {
 	// DetectedHAT is what the HAT step found, so its serial speed can be
 	// used if the user keeps that HAT type.
 	DetectedHAT platform.HAT `json:"detected_hat"`
+	// FlashSeen is the start time of the last firmware flash whose end
+	// this wizard has seen (and asked the HAT again what it runs).
+	FlashSeen int64 `json:"flash_seen,omitempty"`
 }
 
 // IsDone reports whether step id has been completed.

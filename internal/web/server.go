@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/jancona/m17-admin/internal/auth"
+	"github.com/jancona/m17-admin/internal/firmware"
 	"github.com/jancona/m17-admin/internal/platform"
 	"github.com/jancona/m17-admin/internal/settings"
 	"github.com/jancona/m17-admin/internal/wizard"
@@ -327,6 +328,15 @@ func (s *Server) newPage(ctx context.Context, sess *auth.Session, st *wizard.Sta
 		if err := s.store.Save(*st); err != nil {
 			return nil, err
 		}
+	case "firmware":
+		fw, err := s.firmwareInfo(ctx, st)
+		if err != nil {
+			return nil, err
+		}
+		p.Firmware = fw
+		if fw.Status.Running() {
+			p.Refresh = 3
+		}
 	case "reflector":
 		refl, err := s.plat.Reflectors(ctx)
 		if err != nil {
@@ -440,6 +450,10 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 			d.Duplex = false // the CC1200 HAT is simplex
 		}
 		probs = d.CheckHAT()
+	case "firmware":
+		if s.submitFirmware(w, r, sess, &st) {
+			return
+		}
 	case "radio":
 		d.RXFrequency = settings.ParseMHz(f.Get("rx_mhz"))
 		d.Duplex = f.Get("duplex") == "on" && d.HATType != "cc1200"
@@ -578,8 +592,11 @@ type page struct {
 	Countries  []settings.Country
 	TimeZones  []string
 	HAT        platform.HAT
+	Firmware   *firmwareInfo
 	Reflectors []platform.Reflector
 	Result     *platform.Result
+	// Refresh, if set, reloads the page after this many seconds
+	Refresh int
 }
 
 func (s *Server) parseTemplates() error {
@@ -604,8 +621,9 @@ func (s *Server) parseTemplates() error {
 			}
 			return m
 		},
-		"stepIndex": func(id string) int { return wizard.Index(id) + 1 },
-		"done":      func(st *wizard.State, id string) bool { return st != nil && st.IsDone(id) },
+		"familyTitle": firmware.FamilyTitle,
+		"stepIndex":   func(id string) int { return wizard.Index(id) + 1 },
+		"done":        func(st *wizard.State, id string) bool { return st != nil && st.IsDone(id) },
 		"signalBars": func(dbm int) string {
 			switch {
 			case dbm >= -55:

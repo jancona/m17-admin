@@ -120,6 +120,7 @@ func (h *harness) runWizardTo(c *http.Client, stop string) {
 		{"/setup/network", url.Values{"connection": {"wifi"}, "wifi_ssid": {"HomeNetwork"}, "wifi_password": {"wifi-secret"}, "wifi_country": {"US"}}},
 		{"/setup/station", url.Values{"callsign": {"n1adj"}, "suffix": {"h"}, "hostname": {"m17-hotspot"}, "timezone": {"America/New_York"}}},
 		{"/setup/hat", url.Values{"hat_type": {"mmdvm"}}},
+		{"/setup/firmware", url.Values{"action": {"continue"}}},
 		{"/setup/radio", url.Values{"rx_mhz": {"439.500"}, "power": {"10"}}},
 		{"/setup/reflector", url.Values{"reflector": {"M17-XOR"}, "module": {"b"}}},
 		{"/setup/updates", url.Values{"auto_update": {"notify"}, "update_hour": {"4"}}},
@@ -204,6 +205,7 @@ func TestRerunKeepsSavedWiFi(t *testing.T) {
 	h.post(c, "/setup/network", url.Values{"connection": {"wifi"}, "wifi_ssid": {"HomeNetwork"}, "wifi_password": {""}, "wifi_country": {"US"}})
 	h.post(c, "/setup/station", url.Values{"callsign": {"N1ADJ"}, "hostname": {"m17-hotspot"}, "timezone": {"UTC"}})
 	h.post(c, "/setup/hat", url.Values{"hat_type": {"mmdvm"}})
+	h.post(c, "/setup/firmware", url.Values{"action": {"continue"}})
 	h.post(c, "/setup/radio", url.Values{"rx_mhz": {"439.5"}, "power": {"10"}})
 	h.post(c, "/setup/reflector", url.Values{"reflector": {"M17-M17"}, "module": {"C"}})
 	h.post(c, "/setup/updates", url.Values{"auto_update": {"auto"}, "update_hour": {"3"}})
@@ -315,6 +317,7 @@ func TestOutOfBandFrequencyIsAWarning(t *testing.T) {
 	h.post(c, "/setup/network", url.Values{"connection": {"ethernet"}, "wifi_country": {"US"}})
 	h.post(c, "/setup/station", url.Values{"callsign": {"N1ADJ"}, "hostname": {"m17-hotspot"}, "timezone": {"UTC"}})
 	h.post(c, "/setup/hat", url.Values{"hat_type": {"cc1200"}})
+	h.post(c, "/setup/firmware", url.Values{"action": {"continue"}})
 	code, loc, _ := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"460.0"}, "power": {"10"}, "duplex": {"on"}, "tx_mhz": {"455"}})
 	h.expectRedirect(code, loc, "/setup/reflector")
 	h.post(c, "/setup/reflector", url.Values{"reflector": {""}, "module": {"A"}})
@@ -420,4 +423,119 @@ func TestSSHStep(t *testing.T) {
 			t.Errorf("applied settings lack %v: %v", want, got)
 		}
 	}
+}
+
+func TestFirmwareStep(t *testing.T) {
+	h := newHarness(t)
+	c := h.client
+	h.runWizardTo(c, "/setup/firmware")
+
+	_, _, body := h.get(c, "/setup/firmware")
+	if !strings.Contains(body, "Newer firmware is available") || !strings.Contains(body, "v1.5.2 20201108") {
+		t.Errorf("the update isn't offered:\n%s", body)
+	}
+	if !regexp.MustCompile(`value="mmdvm_hs/MMDVM_HS_Dual_Hat.bin" checked`).MatchString(body) {
+		t.Error("the Dual Hat file isn't preselected")
+	}
+	if strings.Contains(body, "CC1200_HAT-fw") {
+		t.Error("CC1200 firmware offered for an MMDVM HAT")
+	}
+
+	for _, bad := range []string{"", "cc1200/CC1200_HAT-fw.bin", "../../etc/passwd"} {
+		code, _, body := h.post(c, "/setup/firmware", url.Values{"action": {"flash"}, "firmware": {bad}})
+		if code != http.StatusUnprocessableEntity || !strings.Contains(body, `class="error"`) {
+			t.Errorf("flash %q: status %d, want an error", bad, code)
+		}
+	}
+	if len(h.fake.Flashed) != 0 {
+		t.Fatalf("flashed %v", h.fake.Flashed)
+	}
+
+	// The fake finishes at once; the HAT then reports the new firmware
+	code, loc, _ := h.post(c, "/setup/firmware", url.Values{"action": {"flash"}, "firmware": {"mmdvm_hs/MMDVM_HS_Dual_Hat.bin"}})
+	h.expectRedirect(code, loc, "/setup/firmware")
+	if !slices.Equal(h.fake.Flashed, []string{"mmdvm_hs/MMDVM_HS_Dual_Hat.bin"}) {
+		t.Errorf("flashed %v", h.fake.Flashed)
+	}
+	_, _, body = h.get(c, "/setup/firmware")
+	if !strings.Contains(body, "Firmware written") || !strings.Contains(body, "newest firmware available") {
+		t.Errorf("after flashing:\n%s", body)
+	}
+	code, loc, _ = h.post(c, "/setup/firmware", url.Values{"action": {"continue"}})
+	h.expectRedirect(code, loc, "/setup/radio")
+}
+
+func TestFirmwareFlashInProgress(t *testing.T) {
+	h := newHarness(t)
+	h.fake.FlashTime = time.Hour
+	c := h.client
+	h.runWizardTo(c, "/setup/firmware")
+	h.post(c, "/setup/firmware", url.Values{"action": {"flash"}, "firmware": {"mmdvm_hs/MMDVM_HS_Dual_Hat.bin"}})
+	_, _, body := h.get(c, "/setup/firmware")
+	if !strings.Contains(body, "Flashing mmdvm_hs/MMDVM_HS_Dual_Hat.bin") || !strings.Contains(body, `http-equiv="refresh"`) {
+		t.Errorf("progress page:\n%s", body)
+	}
+	// No moving on (or flashing again) until it's finished
+	code, _, body := h.postRaw(c, "/setup/firmware", url.Values{"action": {"continue"}, "csrf": {h.csrf(c)}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "Wait for the flash") {
+		t.Errorf("continue during a flash: %d", code)
+	}
+}
+
+func TestFirmwareFlashFails(t *testing.T) {
+	h := newHarness(t)
+	h.fake.FlashFails = true
+	c := h.client
+	h.runWizardTo(c, "/setup/firmware")
+	h.post(c, "/setup/firmware", url.Values{"action": {"flash"}, "firmware": {"mmdvm_hs/MMDVM_HS_Dual_Hat.bin"}})
+	_, _, body := h.get(c, "/setup/firmware")
+	if !strings.Contains(body, "failed") || !strings.Contains(body, "Failed to init device") || !strings.Contains(body, "Newer firmware is available") {
+		t.Errorf("failed flash:\n%s", body)
+	}
+}
+
+func TestFirmwareUnsupportedSystem(t *testing.T) {
+	h := newHarness(t)
+	h.fake.FlashErr = platform.ErrFlashUnsupported
+	c := h.client
+	h.runWizardTo(c, "/setup/firmware")
+	code, _, body := h.post(c, "/setup/firmware", url.Values{"action": {"flash"}, "firmware": {"mmdvm_hs/MMDVM_HS_Dual_Hat.bin"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "update it first") || !strings.Contains(body, "m17os-upgrade") {
+		t.Errorf("unsupported: %d\n%s", code, body)
+	}
+}
+
+func TestFirmwareUnknownBoard(t *testing.T) {
+	h := newHarness(t)
+	h.fake.SetHAT(platform.HAT{})
+	c := h.client
+	h.runWizardTo(c, "/setup/firmware")
+	_, _, body := h.get(c, "/setup/firmware")
+	if !strings.Contains(body, "didn't answer") || !strings.Contains(body, `<details class="files" open>`) || strings.Contains(body, "checked") {
+		t.Errorf("unknown board:\n%s", body)
+	}
+}
+
+func TestFirmwareNotForSX1255(t *testing.T) {
+	h := newHarness(t)
+	c := h.client
+	h.runWizardTo(c, "/setup/hat")
+	h.post(c, "/setup/hat", url.Values{"hat_type": {"sx1255"}})
+	_, _, body := h.get(c, "/setup/firmware")
+	if !strings.Contains(body, "no firmware to update") {
+		t.Errorf("sx1255:\n%s", body)
+	}
+	code, loc, _ := h.post(c, "/setup/firmware", url.Values{"action": {"continue"}})
+	h.expectRedirect(code, loc, "/setup/radio")
+}
+
+// csrf returns the session's CSRF token, from a page.
+func (h *harness) csrf(c *http.Client) string {
+	h.t.Helper()
+	_, _, body := h.get(c, "/setup/firmware")
+	m := csrfRE.FindStringSubmatch(body)
+	if m == nil {
+		h.t.Fatal("no CSRF token")
+	}
+	return m[1]
 }

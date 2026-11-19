@@ -8,7 +8,12 @@
 // the installer) can be added as further implementations.
 package platform
 
-import "context"
+import (
+	"context"
+	"errors"
+
+	"github.com/jancona/m17-admin/internal/firmware"
+)
 
 // Platform is the operating system as m17-admin sees it.
 type Platform interface {
@@ -23,6 +28,18 @@ type Platform interface {
 
 	// DetectHAT asks the radio HAT what it is.
 	DetectHAT(ctx context.Context) (HAT, error)
+
+	// FirmwareImages lists the firmware files the system has for the
+	// HAT's microcontroller.
+	FirmwareImages(ctx context.Context) ([]firmware.Image, error)
+
+	// FlashFirmware starts writing firmware file name (an Image's Name) to
+	// the HAT. It runs in the background; FlashStatus follows it.
+	FlashFirmware(ctx context.Context, name string) error
+
+	// FlashStatus reports the last flash (State "" if none has run since
+	// the system started).
+	FlashStatus(ctx context.Context) (FlashStatus, error)
 
 	// Reflectors lists the reflectors in the gateway's host files.
 	Reflectors(ctx context.Context) ([]Reflector, error)
@@ -85,6 +102,21 @@ type HAT struct {
 	Ident string // what the modem reported, e.g. its firmware version
 	Speed int    // the serial speed it answered at (baud)
 }
+
+// FlashStatus is the state of a firmware flash.
+type FlashStatus struct {
+	State   string   // "" (none), "running", "ok" or "failed"
+	File    string   // the firmware file
+	Started int64    // when it started, in seconds since the epoch
+	Log     []string // the last lines of its output
+}
+
+// Running reports whether a flash is in progress.
+func (s FlashStatus) Running() bool { return s.State == "running" }
+
+// ErrFlashUnsupported is returned by FlashFirmware on a system too old to
+// flash firmware from the wizard.
+var ErrFlashUnsupported = errors.New("this system version can't flash firmware from the setup wizard; update it first")
 
 // Reflector is an entry in the host files.
 type Reflector struct {

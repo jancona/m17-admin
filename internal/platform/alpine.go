@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/jancona/m17-admin/internal/firmware"
 	"github.com/jancona/m17-admin/internal/hat"
 )
 
@@ -42,6 +43,8 @@ type Alpine struct {
 	// SetupAddress is the setup access point's own address: an interface
 	// with it doesn't count as being online.
 	SetupAddress string
+	// FirmwareDir holds the firmware files (the m17-firmware packages).
+	FirmwareDir string
 	// Probe identifies the HAT on a serial port.
 	Probe func(port string) (hat.Result, error)
 
@@ -61,6 +64,7 @@ func NewAlpine() *Alpine {
 		TimeZoneFile:    "/etc/timezone",
 		ScanCache:       "/run/m17os/wifi-scan",
 		SetupAddress:    "192.168.4.1",
+		FirmwareDir:     "/usr/share/m17-firmware",
 		Probe: func(port string) (hat.Result, error) {
 			return hat.Probe(port, hat.OpenSerial)
 		},
@@ -292,6 +296,54 @@ func (a *Alpine) DetectHAT(ctx context.Context) (HAT, error) {
 		return HAT{}, fmt.Errorf("probing %s: %w", port, err)
 	}
 	return HAT{Type: r.Type, Ident: r.Ident, Speed: r.Speed}, nil
+}
+
+// ── Firmware ──────────────────────────────────────────────────────────
+
+func (a *Alpine) FirmwareImages(ctx context.Context) ([]firmware.Image, error) {
+	return firmware.Scan(a.FirmwareDir)
+}
+
+func (a *Alpine) FlashFirmware(ctx context.Context, name string) error {
+	_, err := a.helper(ctx, "", "firmware-flash", name)
+	if err != nil && strings.Contains(err.Error(), "unknown command") {
+		// An admin helper from before firmware flashing
+		return ErrFlashUnsupported
+	}
+	return err
+}
+
+func (a *Alpine) FlashStatus(ctx context.Context) (FlashStatus, error) {
+	out, err := a.helper(ctx, "", "firmware-status")
+	if err != nil {
+		if strings.Contains(err.Error(), "unknown command") {
+			return FlashStatus{}, nil
+		}
+		return FlashStatus{}, err
+	}
+	return parseFlashStatus(out), nil
+}
+
+// parseFlashStatus reads the helper's firmware-status: key=value lines,
+// then "log: " lines.
+func parseFlashStatus(out string) FlashStatus {
+	var s FlashStatus
+	for _, line := range strings.Split(out, "\n") {
+		if l, ok := strings.CutPrefix(line, "log: "); ok {
+			s.Log = append(s.Log, l)
+			continue
+		}
+		k, v, _ := strings.Cut(line, "=")
+		switch k {
+		case "state":
+			s.State = v
+		case "file":
+			s.File = v
+		case "started":
+			s.Started, _ = strconv.ParseInt(v, 10, 64)
+		}
+	}
+	return s
 }
 
 // ── Reflectors and time zones ─────────────────────────────────────────

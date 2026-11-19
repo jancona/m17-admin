@@ -8,10 +8,11 @@ package hat
 import (
 	"bytes"
 	"io"
-	"strings"
 	"time"
 
 	"go.bug.st/serial"
+
+	"github.com/jancona/m17-admin/internal/firmware"
 )
 
 // Port is the part of a serial port the probe uses.
@@ -180,7 +181,6 @@ func parseMMDVM(buf []byte) string {
 	return ""
 }
 
-func oneLine(s string) string {
-	s = strings.ReplaceAll(s, "\r", "")
-	return strings.Join(strings.Fields(strings.ReplaceAll(s, "\n", " / ")), " ")
-}
+// oneLine is firmware.OneLine: the firmware files' descriptions are put
+// on one line the same way, so the two can be compared.
+func oneLine(s string) string { return firmware.OneLine(s) }

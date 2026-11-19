@@ -38,7 +38,9 @@ func main() {
 
 	var plat platform.Platform
 	if *dev {
-		plat = platform.NewFake()
+		fake := platform.NewFake()
+		fake.FlashTime = 10 * time.Second // long enough to see the progress page
+		plat = fake
 		dir, err := os.MkdirTemp("", "m17-admin-dev-")
 		if err != nil {
 			fail(log, err)
