@@ -32,7 +32,7 @@
 	<p class="hint">10 dBm is 10 mW: plenty for a hotspot in the same building. The CC1200 HAT goes from -16 to 14 dBm.</p>
 	{{with index .Errors "power"}}<p class="error">{{.}}</p>{{end}}
 	{{else}}
-	<p class="hint">The transmit power of {{if eq .Draft.HATType "sx1255"}}the SX1255 HAT{{else}}MMDVM boards{{end}} isn't set here.</p>
+	{{if eq .Draft.HATType "sx1255"}}<p class="hint">The SX1255 HAT's transmit level is set with DACGain and MixerGain in the gateway's [Modem] section, not here.</p>{{else}}<p class="hint">m17-gateway doesn't set an MMDVM board's transmit power. A repeater's comes from its radio.</p>{{end}}
 	{{end}}
 
 	<div class="actions">
