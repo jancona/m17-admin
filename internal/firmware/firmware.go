@@ -256,10 +256,10 @@ func Check(ident string, families []string, imgs []Image) Report {
 		r.State = Update
 	case c < 0:
 		r.State = Newer
-	case file.git != "" && have.git != "" && file.git != have.git:
-		// Same date and version, different source: offer the packaged one
-		r.State = Update
 	default:
+		// The same date and version is the same firmware, even with another
+		// GitID: a rebuild, or a commit that didn't change the code. Offering
+		// it as an update would be a guess, and it might be older.
 		r.State = Current
 	}
 	if r.State == Update && len(r.Matches) == 1 {

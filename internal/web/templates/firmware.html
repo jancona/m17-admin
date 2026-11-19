@@ -14,7 +14,7 @@
 {{else if $fw.Status.Running}}
 <div class="notice warn">
 	<p><strong>Flashing {{$fw.Status.File}}…</strong></p>
-	<p>This takes about a minute. Keep the hotspot powered on; this page updates by itself.</p>
+	<p>This takes up to three minutes (hotspot boards about 30 seconds, repeater boards longer). Keep the hotspot powered on; this page updates by itself.</p>
 	{{with $fw.Status.Log}}<pre class="log">{{range .}}{{.}}
 {{end}}</pre>{{end}}
 </div>
@@ -85,7 +85,7 @@
 	{{with index .Errors "firmware"}}<p class="error">{{.}}</p>{{end}}
 	{{if $fw.Unsupported}}<p class="hint">Let the hotspot update itself (or run <code>doas m17os-upgrade --install</code> over SSH), then come back to this step.</p>{{end}}
 	{{if or $fw.Matches $fw.Others}}
-	<p class="hint">Flashing takes about a minute and the gateway is stopped meanwhile. A board given the wrong file stops working until it gets the right one, but it can't be damaged.</p>
+	<p class="hint">Flashing takes up to three minutes and the gateway is stopped meanwhile. A board given the wrong file stops working until it gets the right one, but it can't be damaged.</p>
 	{{else}}
 	<p class="hint">No firmware files are installed.</p>
 	{{end}}

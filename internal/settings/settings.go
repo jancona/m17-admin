@@ -238,6 +238,24 @@ func bandOf(mhz float64) string {
 	return ""
 }
 
+// What m17-gateway accepts. Its checks are the CC1200 HAT's, but it
+// applies them whatever the HAT: a value outside them stops the gateway
+// from starting ("Bad configuration").
+const (
+	GatewayMinMHz = 420.0
+	GatewayMaxMHz = 450.0
+	MinPower      = -16 // dBm
+	MaxPower      = 14
+	// DefaultPower is written for HATs that don't use the setting (it must
+	// still be in range)
+	DefaultPower = 10
+)
+
+// UsesPower reports whether the HAT's transmit power is set in
+// m17-gateway's configuration. Only the CC1200 HAT's is: MMDVM boards
+// and the SX1255 HAT ignore it.
+func (d Draft) UsesPower() bool { return d.HATType == "cc1200" }
+
 // CheckRadio checks the radio step.
 func (d Draft) CheckRadio() Problems {
 	p := newProblems()
@@ -247,6 +265,8 @@ func (d Draft) CheckRadio() Problems {
 			p.Errors[field] = "Enter the frequency in MHz, e.g. 439.500."
 		case mhz < 100 || mhz > 6000:
 			p.Errors[field] = "That doesn't look like a frequency in MHz."
+		case mhz < GatewayMinMHz || mhz > GatewayMaxMHz:
+			p.Errors[field] = "m17-gateway works between 420 and 450 MHz for now."
 		case bandOf(mhz) == "":
 			p.Warnings[field] = "This is outside the usual amateur bands. Check it's allowed where you are."
 		}
@@ -258,8 +278,8 @@ func (d Draft) CheckRadio() Problems {
 			p.Errors["tx_mhz"] = "In duplex the receive and transmit frequencies must differ."
 		}
 	}
-	if d.Power < -20 || d.Power > 30 {
-		p.Errors["power"] = "Enter a power between -20 and 30 dBm."
+	if d.UsesPower() && (d.Power < MinPower || d.Power > MaxPower) {
+		p.Errors["power"] = fmt.Sprintf("Enter a power between %d and %d dBm, the CC1200 HAT's range.", MinPower, MaxPower)
 	}
 	return p
 }
@@ -387,7 +407,11 @@ func (d Draft) Settings() []platform.Setting {
 		add("frequency", mhz(d.RXFrequency))
 		add("duplex", "false")
 	}
-	add("power", strconv.Itoa(d.Power))
+	power := d.Power
+	if !d.UsesPower() && (power < MinPower || power > MaxPower) {
+		power = DefaultPower // unused, but the gateway checks it
+	}
+	add("power", strconv.Itoa(power))
 	if d.Reflector != "" {
 		add("reflector", d.Reflector)
 		add("module", d.Module)

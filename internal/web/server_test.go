@@ -310,23 +310,40 @@ func TestValidationErrorsKeepInput(t *testing.T) {
 	h.expectRedirect(code, loc, "/setup/station")
 }
 
-func TestOutOfBandFrequencyIsAWarning(t *testing.T) {
+// m17-gateway refuses to start with a frequency outside 420-450 MHz or a
+// power outside -16 to 14 dBm, whatever the HAT, so the wizard mustn't
+// accept them. Power is only asked for the CC1200 HAT.
+func TestRadioMatchesGatewayLimits(t *testing.T) {
 	h := newHarness(t)
 	c := h.client
-	h.post(c, "/setup/password", url.Values{"password": {"long-enough"}, "confirm": {"long-enough"}})
-	h.post(c, "/setup/network", url.Values{"connection": {"ethernet"}, "wifi_country": {"US"}})
-	h.post(c, "/setup/station", url.Values{"callsign": {"N1ADJ"}, "hostname": {"m17-hotspot"}, "timezone": {"UTC"}})
-	h.post(c, "/setup/hat", url.Values{"hat_type": {"cc1200"}})
-	h.post(c, "/setup/firmware", url.Values{"action": {"continue"}})
-	code, loc, _ := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"460.0"}, "power": {"10"}, "duplex": {"on"}, "tx_mhz": {"455"}})
-	h.expectRedirect(code, loc, "/setup/reflector")
-	h.post(c, "/setup/reflector", url.Values{"reflector": {""}, "module": {"A"}})
-	h.post(c, "/setup/updates", url.Values{"auto_update": {"auto"}, "update_hour": {"3"}})
-	h.post(c, "/setup/ssh", url.Values{})
-	_, _, body := h.get(c, "/setup/review")
-	if !strings.Contains(body, "outside the usual amateur bands") {
-		t.Error("review page doesn't repeat the band warning")
+	h.runWizardTo(c, "/setup/radio") // an MMDVM HAT
+	_, _, body := h.get(c, "/setup/radio")
+	if strings.Contains(body, `name="power"`) {
+		t.Error("power is asked for an MMDVM board")
 	}
+	code, _, body := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"460.0"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "between 420 and 450 MHz") {
+		t.Errorf("460 MHz: status %d", code)
+	}
+	// A repeater's "30" (ignored by MMDVM boards) can't reach the gateway
+	code, loc, _ := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"446.45"}, "duplex": {"on"}, "tx_mhz": {"441.45"}, "power": {"30"}})
+	h.expectRedirect(code, loc, "/setup/reflector")
+
+	h2 := newHarness(t)
+	c2 := h2.client
+	h2.runWizardTo(c2, "/setup/hat")
+	h2.post(c2, "/setup/hat", url.Values{"hat_type": {"cc1200"}})
+	h2.post(c2, "/setup/firmware", url.Values{"action": {"continue"}})
+	code, _, body = h2.post(c2, "/setup/radio", url.Values{"rx_mhz": {"439.5"}, "power": {"20"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "between -16 and 14 dBm") {
+		t.Errorf("CC1200 at 20 dBm: status %d", code)
+	}
+	code, loc, _ = h2.post(c2, "/setup/radio", url.Values{"rx_mhz": {"439.5"}, "power": {"14"}, "duplex": {"on"}, "tx_mhz": {"434.5"}})
+	h2.expectRedirect(code, loc, "/setup/reflector")
+	h2.post(c2, "/setup/reflector", url.Values{"reflector": {""}, "module": {"A"}})
+	h2.post(c2, "/setup/updates", url.Values{"auto_update": {"auto"}, "update_hour": {"3"}})
+	h2.post(c2, "/setup/ssh", url.Values{})
+	_, _, body = h2.get(c2, "/setup/review")
 	if !strings.Contains(body, "None (RF only)") || strings.Contains(body, "duplex") {
 		t.Errorf("review: RF only, and the CC1200 can't be duplex:\n%s", body)
 	}

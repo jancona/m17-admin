@@ -461,9 +461,11 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 		if d.Duplex {
 			d.TXFrequency = settings.ParseMHz(f.Get("tx_mhz"))
 		}
-		d.Power, err = strconv.Atoi(strings.TrimSpace(f.Get("power")))
-		if err != nil {
-			d.Power = -999 // reported by CheckRadio
+		if d.UsesPower() {
+			d.Power, err = strconv.Atoi(strings.TrimSpace(f.Get("power")))
+			if err != nil {
+				d.Power = -999 // reported by CheckRadio
+			}
 		}
 		probs = d.CheckRadio()
 	case "reflector":

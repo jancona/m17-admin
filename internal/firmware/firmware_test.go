@@ -41,7 +41,10 @@ func TestCheck(t *testing.T) {
 		{"newer on the board", "MMDVM_HS_Hat-v1.6.2 20270301 14.7456MHz ADF7021 FW by CA6JAU (M17) GitID #abcdef0",
 			mmdvm, Newer, "", 1},
 		{"same date, other source", "MMDVM_HS_Hat-v1.6.1 20261116 14.7456MHz ADF7021 FW by CA6JAU GitID #1111111",
-			mmdvm, Update, "mmdvm_hs/MMDVM_HS_Hat.bin", 1},
+			mmdvm, Current, "", 1},
+		// The V4 on the test Pi 3: built a commit after the packaged file
+		{"repeater builder v4 rebuilt", "MMDVM RB_STM32_DVM(446) 20251014 12.0000 MHz GitID #0471a54",
+			mmdvm, Current, "", 1},
 		{"repeater boards share a description", "MMDVM 20240101 12.0000 MHz GitID #0000000",
 			mmdvm, Update, "", 2},
 		{"repeater builder v4", "MMDVM RB_STM32_DVM(446) 20240101 12.0000 MHz GitID #0000000",

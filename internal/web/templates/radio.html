@@ -25,11 +25,15 @@
 	{{end}}
 	<p class="hint">Choose a frequency your local band plan sets aside for digital voice or hotspots, and that nobody nearby uses.</p>
 
+	{{if .Draft.UsesPower}}
 	<label for="power">Transmit power (dBm)</label>
-	<input id="power" name="power" type="number" min="-20" max="30" step="1" value="{{.Draft.Power}}" class="short"
+	<input id="power" name="power" type="number" min="-16" max="14" step="1" value="{{.Draft.Power}}" class="short"
 		{{with index .Errors "power"}}aria-invalid="true"{{end}}>
-	<p class="hint">10 dBm is 10 mW: plenty for a hotspot in the same building.</p>
+	<p class="hint">10 dBm is 10 mW: plenty for a hotspot in the same building. The CC1200 HAT goes from -16 to 14 dBm.</p>
 	{{with index .Errors "power"}}<p class="error">{{.}}</p>{{end}}
+	{{else}}
+	<p class="hint">The transmit power of {{if eq .Draft.HATType "sx1255"}}the SX1255 HAT{{else}}MMDVM boards{{end}} isn't set here.</p>
+	{{end}}
 
 	<div class="actions">
 		{{if .Prev}}<a class="back" href="/setup/{{.Prev}}">Back</a>{{end}}

@@ -58,9 +58,10 @@ func TestChecksReject(t *testing.T) {
 		{"bad hat", func(d *Draft) { d.HATType = "rtl-sdr" }, func(d Draft) Problems { return d.CheckHAT() }, "hat_type", false},
 		{"no frequency", func(d *Draft) { d.RXFrequency = math.NaN() }, radioCheck, "rx_mhz", false},
 		{"frequency in Hz", func(d *Draft) { d.RXFrequency = 439500000 }, radioCheck, "rx_mhz", false},
-		{"out of band", func(d *Draft) { d.RXFrequency = 460.0 }, radioCheck, "rx_mhz", true},
+		{"outside the gateway's range", func(d *Draft) { d.RXFrequency = 460.0 }, radioCheck, "rx_mhz", false},
+		{"2 m", func(d *Draft) { d.RXFrequency = 145.0 }, radioCheck, "rx_mhz", false},
 		{"duplex same frequency", func(d *Draft) { d.Duplex = true }, radioCheck, "tx_mhz", false},
-		{"power", func(d *Draft) { d.Power = 40 }, radioCheck, "power", false},
+		{"cc1200 power", func(d *Draft) { d.HATType = "cc1200"; d.Power = 15 }, radioCheck, "power", false},
 		{"unknown reflector", func(d *Draft) { d.Reflector = "M17-NOPE" }, reflCheck, "reflector", false},
 		{"bad module", func(d *Draft) { d.Module = "c1" }, reflCheck, "module", false},
 		{"bad policy", func(d *Draft) { d.AutoUpdate = "sometimes" }, func(d Draft) Problems { return d.CheckUpdates() }, "auto_update", false},
@@ -256,5 +257,34 @@ func TestSSH(t *testing.T) {
 	d.UserPassword = "long-enough"
 	if d.CheckSSH("different").Errors["user_confirm"] == "" {
 		t.Error("mismatched confirmation accepted")
+	}
+}
+
+// Only the CC1200 HAT uses the power setting, but m17-gateway checks it
+// whatever the HAT, so an out-of-range value is replaced for the others.
+func TestPowerForOtherHATs(t *testing.T) {
+	power := func(d Draft) string {
+		for _, s := range d.Settings() {
+			if s.Key == "power" {
+				return s.Value
+			}
+		}
+		return ""
+	}
+	d := good()
+	d.Power = 30
+	if p := d.CheckRadio(); !p.OK() {
+		t.Errorf("MMDVM with Power 30: %v", p.Errors)
+	}
+	if got := power(d); got != "10" {
+		t.Errorf("MMDVM with Power 30 writes power=%s, want 10", got)
+	}
+	d.Power = -5
+	if got := power(d); got != "-5" {
+		t.Errorf("an in-range power is kept: got %s", got)
+	}
+	d.HATType, d.Power = "cc1200", 14
+	if p := d.CheckRadio(); !p.OK() || power(d) != "14" {
+		t.Errorf("CC1200 at 14 dBm: %v, %s", p.Errors, power(d))
 	}
 }
