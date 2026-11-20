@@ -172,7 +172,7 @@ var (
 	// optional prefix and suffix, or a 6-7 character name like W100AW.
 	// Slightly stricter than the gateway about separators.
 	gatewayCallsignRE = regexp.MustCompile(`^(([0-9]?[A-Z]{1,2}[0-9]{0,2}/)?[0-9]?[A-Z]{1,2}[0-9]{1,2}[A-Z]{1,4}([ /.-][A-Z0-9 /.-]*)?|[A-Z][-A-Z0-9]{5,6}( +[ A-Z])?)$`)
-	hostnameRE = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+	hostnameRE        = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 )
 
 // UpdateKeepWiFi decides KeepWiFi after the network step: a saved
