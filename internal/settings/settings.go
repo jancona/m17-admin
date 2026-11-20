@@ -42,6 +42,16 @@ type Draft struct {
 	TXFrequency float64 `json:"tx_mhz"`
 	Duplex      bool    `json:"duplex"`
 	Power       int     `json:"power"`
+	// RFLevel is the MMDVM_HS transmit power, 1-100 percent; 0 in a
+	// draft saved before it existed (then left as it is)
+	RFLevel int `json:"rf_level"`
+	// RFLevelWas is the hotspot's RFLevel when the wizard started. Only a
+	// change is applied, so images whose m17os-config predates rf_level
+	// don't warn about it on every run.
+	RFLevelWas int `json:"rf_level_was"`
+	// RepeaterBoard is true when the HAT step found MMDVM repeater
+	// firmware, which takes its power from the attached radio
+	RepeaterBoard bool `json:"repeater_board"`
 
 	// Reflector ("" for RF only)
 	Reflector string `json:"reflector"`
@@ -78,6 +88,8 @@ func FromCurrent(c platform.Current) Draft {
 		TXFrequency: float64(c.TXFrequency) / 1e6,
 		Duplex:      c.Duplex,
 		Power:       c.Power,
+		RFLevel:     c.RFLevel,
+		RFLevelWas:  c.RFLevel,
 		Reflector:   c.Reflector,
 		Module:      c.Module,
 		AutoUpdate:  c.AutoUpdate,
@@ -156,6 +168,10 @@ func (d Draft) CheckNetwork(countries []string) Problems {
 
 var (
 	callsignRE = regexp.MustCompile(`^[A-Z0-9/.-]+$`)
+	// What m17-gateway accepts (m17.EncodeCallsign): a callsign, with an
+	// optional prefix and suffix, or a 6-7 character name like W100AW.
+	// Slightly stricter than the gateway about separators.
+	gatewayCallsignRE = regexp.MustCompile(`^(([0-9]?[A-Z]{1,2}[0-9]{0,2}/)?[0-9]?[A-Z]{1,2}[0-9]{1,2}[A-Z]{1,4}([ /.-][A-Z0-9 /.-]*)?|[A-Z][-A-Z0-9]{5,6}( +[ A-Z])?)$`)
 	hostnameRE = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 )
 
@@ -183,6 +199,9 @@ func (d Draft) CheckStation(timeZones []string) Problems {
 		p.Errors["callsign"] = "Enter your callsign."
 	case !callsignRE.MatchString(d.Callsign):
 		p.Errors["callsign"] = "Use only letters, digits, / - and ."
+	case !gatewayCallsignRE.MatchString(d.Callsign):
+		// m17-gateway wouldn't start with it
+		p.Errors["callsign"] = "That doesn't look like a callsign: letters, then a digit, then letters (N1ADJ, 2E0ABC), with an optional prefix (EA/N1ADJ) or suffix (N1ADJ/P)."
 	case !strings.ContainsAny(d.Callsign, "0123456789"):
 		p.Warnings["callsign"] = "Callsigns usually contain a digit. Check it's right."
 	}
@@ -281,6 +300,17 @@ func (d Draft) freqRange() (lo, hi float64, name string, ok bool) {
 // and the SX1255 HAT ignore it.
 func (d Draft) UsesPower() bool { return d.HATType == "cc1200" }
 
+// SetDetected records what the HAT step found: a HAT answering with MMDVM
+// repeater firmware ("MMDVM 20251014 ...", where hotspot boards say
+// "MMDVM_HS_Hat-v1.6.1 ..." or similar) takes its power from its radio.
+func (d *Draft) SetDetected(h platform.HAT) {
+	d.RepeaterBoard = d.HATType == "mmdvm" && h.Type == "mmdvm" && strings.HasPrefix(h.Ident, "MMDVM ")
+}
+
+// UsesRFLevel reports whether the HAT's transmit power is set as
+// [Modem] RFLevel: MMDVM hotspot boards. Repeater boards ignore it.
+func (d Draft) UsesRFLevel() bool { return d.HATType == "mmdvm" && !d.RepeaterBoard }
+
 // CheckRadio checks the radio step.
 func (d Draft) CheckRadio() Problems {
 	p := newProblems()
@@ -308,6 +338,9 @@ func (d Draft) CheckRadio() Problems {
 	}
 	if d.UsesPower() && (d.Power < MinPower || d.Power > MaxPower) {
 		p.Errors["power"] = fmt.Sprintf("Enter a power between %d and %d dBm, the CC1200 HAT's range.", MinPower, MaxPower)
+	}
+	if d.UsesRFLevel() && (d.RFLevel < 1 || d.RFLevel > 100) {
+		p.Errors["rf_level"] = "Enter a power between 1 and 100 percent."
 	}
 	return p
 }
@@ -440,6 +473,9 @@ func (d Draft) Settings() []platform.Setting {
 		power = DefaultPower // unused; older gateways checked it anyway
 	}
 	add("power", strconv.Itoa(power))
+	if d.UsesRFLevel() && d.RFLevel >= 1 && d.RFLevel <= 100 && d.RFLevel != d.RFLevelWas {
+		add("rf_level", strconv.Itoa(d.RFLevel))
+	}
 	if d.Reflector != "" {
 		add("reflector", d.Reflector)
 		add("module", d.Module)

@@ -602,3 +602,27 @@ func TestSSHPasswordMismatch(t *testing.T) {
 		"user_password": {"radiotest1"}, "user_confirm": {"radiotest1"}})
 	h.expectRedirect(code, loc, "/setup/review")
 }
+
+// MMDVM hotspot boards get a transmit power field, written as rf_level.
+func TestRFLevelField(t *testing.T) {
+	h := newHarness(t)
+	c := h.client
+	h.runWizardTo(c, "/setup/radio") // the fake HAT is an MMDVM_HS_Dual_Hat
+	_, _, body := h.get(c, "/setup/radio")
+	if !strings.Contains(body, `name="rf_level"`) || !strings.Contains(body, `value="100"`) {
+		t.Fatal("no transmit power field for an MMDVM_HS board")
+	}
+	code, _, body := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"439.5"}, "rf_level": {"0"}})
+	if code != http.StatusUnprocessableEntity || !strings.Contains(body, "between 1 and 100 percent") {
+		t.Errorf("RF level 0: status %d", code)
+	}
+	code, loc, _ := h.post(c, "/setup/radio", url.Values{"rx_mhz": {"439.5"}, "rf_level": {"30"}})
+	h.expectRedirect(code, loc, "/setup/reflector")
+	h.post(c, "/setup/reflector", url.Values{"reflector": {""}, "module": {"A"}})
+	h.post(c, "/setup/updates", url.Values{"auto_update": {"auto"}, "update_hour": {"3"}})
+	h.post(c, "/setup/ssh", url.Values{})
+	_, _, body = h.get(c, "/setup/review")
+	if !strings.Contains(body, "30% power") {
+		t.Error("review doesn't show the transmit power")
+	}
+}

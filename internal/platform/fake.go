@@ -54,6 +54,7 @@ func NewFake() *Fake {
 			RXFrequency: 439_000_000,
 			TXFrequency: 439_000_000,
 			Power:       10,
+			RFLevel:     100,
 			Reflector:   "M17-M17",
 			Module:      "C",
 			AutoUpdate:  "auto",

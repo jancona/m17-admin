@@ -54,6 +54,7 @@ func (s *Server) firmwareInfo(ctx context.Context, st *wizard.State) (*firmwareI
 			s.log.Warn("HAT detection after flashing failed", "err", err)
 		}
 		st.DetectedHAT = hat
+		st.Draft.SetDetected(hat) // the new firmware may be another kind
 		st.FlashSeen = status.Started
 		if err := s.store.Save(*st); err != nil {
 			return nil, err

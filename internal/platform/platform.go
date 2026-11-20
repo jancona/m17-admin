@@ -75,6 +75,7 @@ type Current struct {
 	TXFrequency int64    // Hz
 	Duplex      bool
 	Power       int // dBm
+	RFLevel     int // MMDVM_HS transmit power, percent (100 when unset)
 	Reflector   string
 	Module      string
 	AutoUpdate  string // auto, notify or off
