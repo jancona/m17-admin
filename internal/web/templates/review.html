@@ -14,7 +14,7 @@
 	<dt>Radio HAT</dt>
 	<dd>{{if eq .HATType "cc1200"}}CC1200{{else if eq .HATType "mmdvm"}}MMDVM{{else}}SX1255{{end}}{{if .ModemSpeed}}, {{.ModemSpeed}} baud (detected){{end}} <a href="/setup/hat">Change</a></dd>
 	<dt>Frequency</dt>
-	<dd>{{if .Duplex}}RX {{mhz .RXFrequency}} MHz, TX {{mhz .TXFrequency}} MHz (duplex){{else}}{{mhz .RXFrequency}} MHz{{end}}, {{.Power}} dBm
+	<dd>{{if .Duplex}}RX {{mhz .RXFrequency}} MHz, TX {{mhz .TXFrequency}} MHz (duplex){{else}}{{mhz .RXFrequency}} MHz{{end}}{{if .UsesPower}}, {{.Power}} dBm{{else if .UsesRFLevel}}, {{.RFLevel}}% power{{end}}
 		<a href="/setup/radio">Change</a></dd>
 	<dt>Reflector</dt>
 	<dd>{{if .Reflector}}{{.Reflector}} module {{.Module}}{{else}}None (RF only){{end}} <a href="/setup/reflector">Change</a></dd>

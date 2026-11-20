@@ -154,6 +154,10 @@ func (a *Alpine) Current(ctx context.Context) (Current, error) {
 	c.TXFrequency, _ = strconv.ParseInt(ini["Radio"]["TXFrequency"], 10, 64)
 	c.Duplex = strings.EqualFold(ini["Radio"]["Duplex"], "true")
 	c.Power, _ = strconv.Atoi(ini["Radio"]["Power"])
+	c.RFLevel = 100 // m17-gateway's default
+	if v, err := strconv.Atoi(ini["Modem"]["RFLevel"]); err == nil && v >= 0 && v <= 100 {
+		c.RFLevel = v
+	}
 	c.Reflector = ini["Reflector"]["Name"]
 	c.Module = ini["Reflector"]["Module"]
 

@@ -449,6 +449,7 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 		if d.HATType == "cc1200" {
 			d.Duplex = false // the CC1200 HAT is simplex
 		}
+		d.SetDetected(st.DetectedHAT)
 		probs = d.CheckHAT()
 	case "firmware":
 		if s.submitFirmware(w, r, sess, &st) {
@@ -465,6 +466,16 @@ func (s *Server) submitStep(w http.ResponseWriter, r *http.Request) {
 			d.Power, err = strconv.Atoi(strings.TrimSpace(f.Get("power")))
 			if err != nil {
 				d.Power = -999 // reported by CheckRadio
+			}
+		}
+		if d.UsesRFLevel() {
+			if v := strings.TrimSpace(f.Get("rf_level")); v != "" {
+				d.RFLevel, err = strconv.Atoi(v)
+				if err != nil {
+					d.RFLevel = -1 // reported by CheckRadio
+				}
+			} else if d.RFLevel == 0 {
+				d.RFLevel = 100 // a draft from before the setting: the gateway's default
 			}
 		}
 		probs = d.CheckRadio()

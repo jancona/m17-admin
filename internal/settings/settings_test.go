@@ -12,7 +12,7 @@ func good() Draft {
 	return Draft{
 		UseWiFi: true, WiFiSSID: "Home", WiFiPassword: "secret-pass", WiFiCountry: "US",
 		Callsign: "N1ADJ", Suffix: "H", Hostname: "m17-hotspot", TimeZone: "America/New_York",
-		HATType: "mmdvm", RXFrequency: 439.5, TXFrequency: 439.5, Power: 10,
+		HATType: "mmdvm", RXFrequency: 439.5, TXFrequency: 439.5, Power: 10, RFLevel: 100,
 		Reflector: "M17-M17", Module: "C", AutoUpdate: "auto", UpdateHour: 3,
 	}
 }
@@ -51,6 +51,9 @@ func TestChecksReject(t *testing.T) {
 		{"bad callsign chars", func(d *Draft) { d.Callsign = "N1*ADJ" }, stationCheck, "callsign", false},
 		{"callsign too long", func(d *Draft) { d.Callsign = "AB1CDEFG" }, stationCheck, "callsign", false},
 		{"callsign without digit", func(d *Draft) { d.Callsign = "NOCALL" }, stationCheck, "callsign", true},
+		{"not a callsign the gateway takes", func(d *Draft) { d.Callsign = "NADJ" }, stationCheck, "callsign", false},
+		{"mmdvm power", func(d *Draft) { d.RFLevel = 0 }, radioCheck, "rf_level", false},
+		{"mmdvm power too high", func(d *Draft) { d.RFLevel = 101 }, radioCheck, "rf_level", false},
 		{"two-letter suffix", func(d *Draft) { d.Suffix = "HS" }, stationCheck, "suffix", false},
 		{"bad hostname", func(d *Draft) { d.Hostname = "-hotspot" }, stationCheck, "hostname", false},
 		{"upper-case hostname", func(d *Draft) { d.Hostname = "Hotspot" }, stationCheck, "hostname", false},
@@ -159,6 +162,7 @@ func TestSettings(t *testing.T) {
 		{Key: "frequency", Value: "439.5"},
 		{Key: "duplex", Value: "false"},
 		{Key: "power", Value: "10"},
+		{Key: "rf_level", Value: "100"}, // RFLevelWas 0: a change
 		{Key: "reflector", Value: "M17-M17"},
 		{Key: "module", Value: "C"},
 		{Key: "auto_update", Value: "auto"},
@@ -314,6 +318,50 @@ func TestFrequencyPerHAT(t *testing.T) {
 		p := d.CheckRadio()
 		if (p.Errors["rx_mhz"] != "") != tc.err || (p.Warnings["rx_mhz"] != "") != tc.warn {
 			t.Errorf("%s at %g MHz: errors %v, warnings %v", tc.hat, tc.mhz, p.Errors, p.Warnings)
+		}
+	}
+}
+
+func TestRFLevel(t *testing.T) {
+	has := func(d Draft) (string, bool) {
+		for _, s := range d.Settings() {
+			if s.Key == "rf_level" {
+				return s.Value, true
+			}
+		}
+		return "", false
+	}
+	d := good() // an MMDVM board, nothing detected
+	d.RFLevel = 25
+	if v, ok := has(d); !ok || v != "25" {
+		t.Errorf("MMDVM hotspot: rf_level %q, %v", v, ok)
+	}
+	// A repeater board: no field, nothing written, no error
+	d.SetDetected(platform.HAT{Type: "mmdvm", Ident: "MMDVM RB_STM32_DVM(446) 20251014 12.0000 MHz GitID #9267a90"})
+	if d.UsesRFLevel() {
+		t.Error("repeater board offered RF level")
+	}
+	d.RFLevel = 0
+	if _, ok := has(d); ok || !d.CheckRadio().OK() {
+		t.Errorf("repeater board: rf_level written or refused: %v", d.CheckRadio().Errors)
+	}
+	d.SetDetected(platform.HAT{Type: "mmdvm", Ident: "MMDVM_HS_Dual_Hat-v1.6.1 20261116 14.7456MHz dual ADF7021 FW by CA6JAU (M17) GitID #02e5646"})
+	if !d.UsesRFLevel() {
+		t.Error("MMDVM_HS board not offered RF level")
+	}
+	// Unchanged: not written
+	d.RFLevel, d.RFLevelWas = 60, 60
+	if _, ok := has(d); ok {
+		t.Error("an unchanged RF level was written")
+	}
+	// A draft saved before the setting existed (0) writes nothing
+	if _, ok := has(d); ok {
+		t.Error("RF level 0 written")
+	}
+	for _, hat := range []string{"cc1200", "sx1255"} {
+		d.HATType, d.RFLevel = hat, 50
+		if _, ok := has(d); ok || d.UsesRFLevel() {
+			t.Errorf("%s: RF level used", hat)
 		}
 	}
 }
