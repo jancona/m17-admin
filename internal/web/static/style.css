@@ -175,3 +175,10 @@ button.secondary { background: none; color: var(--accent); border: 2px solid var
 details.files { margin: 12px 0; }
 details.files summary { cursor: pointer; color: var(--accent); }
 pre.log { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; margin: 6px 0; max-height: 14em; overflow-y: auto; }
+
+/* Activity page */
+.table-wrap { overflow-x: auto; }
+table.activity { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.activity th, table.activity td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.activity td:last-child { white-space: normal; word-break: break-word; }
+table.activity tr.active td { background: var(--ok-bg); font-weight: 600; }
